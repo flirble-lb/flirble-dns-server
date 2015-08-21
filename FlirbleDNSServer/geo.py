@@ -43,7 +43,8 @@ class Geo(object):
 
 		# Lookup the client address
 		try:
-			city = self.geodb.city(client)
+			with self.lock:
+				city = self.geodb.city(client)
 		except:
 			print "Can't do city lookup on %s" % client
 			return False
