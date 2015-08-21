@@ -1,13 +1,29 @@
 #!/usr/bin/env python
 # Flirble DNS Server
 
+import argparse, sys
 import FlirbleDNSServer as fdns
 
-ADDRESS = ''
+ADDRESS = '::'
 PORT = 8053
+ZONES = "zones.json"
+SERVERS = "servers.json"
+GEODB = "/usr/local/share/GeoIP/GeoLite2-City.mmdb"
 
-print "Running test DNS server on port %d" % (PORT)
-fdns.debug = True
-server = fdns.Server(ADDRESS, PORT, "zones.json", "servers.json", "/usr/local/share/GeoIP/GeoLite2-City.mmdb")
+parser = argparse.ArgumentParser(description="Flirble DNS Server")
+parser.add_argument("-d", "--debug", default=fdns.debug, action="store_true", help="Print diagnostic data. [%s]" % str(fdns.debug))
+parser.add_argument("-a", "--address", metavar="ip-address", default=ADDRESS, help="IP address to bind to. The default binds to the wildcard for both IPv4 and IPv6. [%s]" % ADDRESS)
+parser.add_argument("-p", "--port", metavar="number", default=PORT, type=int, help="TCP and UDP port number to listen on. [%d]" % PORT)
+parser.add_argument("-z", "--zones", metavar="filename", default=ZONES, help="Zones JSON file. [%s]" % ZONES)
+parser.add_argument("-s", "--servers", metavar="filename", default=SERVERS, help="Servers JSON file. [%s]" % SERVERS)
+parser.add_argument("-g", "--geodb", metavar="filename", default=GEODB, help="GeoIP City database file to use. [%s]" % GEODB)
+
+args = parser.parse_args()
+
+fdns.debug = args.debug
+if fdns.debug:
+	print "Running DNS server on %s port %d" % (args.address, args.port)
+
+server = fdns.Server(args.address, args.port, args.zones, args.servers, args.geodb)
 server.run()
 
