@@ -2,7 +2,7 @@
 # Flirble DNS Server
 # Handlers for data from clients
 
-import sys, time, datetime
+import sys, time, datetime, socket
 import traceback
 import SocketServer
 
@@ -67,6 +67,7 @@ class TCPRequestHandler(BaseRequestHandler):
 
 
 class UDPServer(SocketServer.ThreadingUDPServer):
+    address_family = socket.AF_INET6
 
     response = None
 
@@ -77,6 +78,7 @@ class UDPServer(SocketServer.ThreadingUDPServer):
 
 
 class TCPServer(SocketServer.ThreadingTCPServer):
+    address_family = socket.AF_INET6
 
     response = None
 
