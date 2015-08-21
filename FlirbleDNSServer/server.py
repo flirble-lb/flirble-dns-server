@@ -16,10 +16,11 @@ class Server(object):
 
     servers = None
 
-    def __init__(self, address=ADDRESS, port=PORT, zones=None, servers=None):
+    def __init__(self, address=ADDRESS, port=PORT, zones=None, servers=None, geodb=None):
         super(Server, self).__init__()
 
-        request = fdns.Request(zones=zones, servers=servers)
+        geo = fdns.Geo(geodb=geodb)
+        request = fdns.Request(zones=zones, servers=servers, geo=geo)
 
         self.servers = []
         self.servers.append(fdns.UDPServer((address, port), fdns.UDPRequestHandler, request))
