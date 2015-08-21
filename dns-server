@@ -8,6 +8,6 @@ PORT = 8053
 
 print "Running test DNS server on port %d" % (PORT)
 fdns.debug = True
-server = fdns.Server(ADDRESS, PORT)
+server = fdns.Server(ADDRESS, PORT, "zones.json", "servers.json")
 server.run()
 
