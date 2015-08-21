@@ -1,0 +1,13 @@
+#!/usr/bin/env python
+# Flirble DNS Server
+
+import FlirbleDNSServer as fdns
+
+ADDRESS = ''
+PORT = 8053
+
+print "Running test DNS server on port %d" % (PORT)
+fdns.debug = True
+server = fdns.Server(ADDRESS, PORT)
+server.run()
+
