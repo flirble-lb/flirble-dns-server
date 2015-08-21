@@ -11,10 +11,14 @@ except: import __init__ as fdns
 
 
 class BaseRequestHandler(SocketServer.BaseRequestHandler):
+
+    response = None
+
     def __init__(self, request, client_address, server, response=None):
         SocketServer.BaseRequestHandler.__init__(self, request, client_address, server)
-        self.allow_reuse_address = True
-        self.response = response
+
+        if response is not None:
+            self.response = response
 
     def get_data(self):
         raise NotImplementedError
@@ -68,23 +72,27 @@ class TCPRequestHandler(BaseRequestHandler):
 
 class UDPServer(SocketServer.ThreadingUDPServer):
     address_family = socket.AF_INET6
+    allow_reuse_address = True
 
     response = None
 
     def __init__(self, server_address, RequestHandlerClass, response=None):
         SocketServer.ThreadingUDPServer.__init__(self, server_address, RequestHandlerClass)
 
-        self.response = response
+        if response is not None:
+            self.response = response
 
 
 class TCPServer(SocketServer.ThreadingTCPServer):
     address_family = socket.AF_INET6
+    allow_reuse_address = True
 
     response = None
 
     def __init__(self, server_address, RequestHandlerClass, response=None):
         SocketServer.ThreadingTCPServer.__init__(self, server_address, RequestHandlerClass)
 
-        self.response = response
+        if response is not None:
+            self.response = response
 
 
