@@ -3,7 +3,7 @@
 == Ubuntu depdendencies
 
 ```
-sudo apt-get install -y build-essential git autoconf automake libtool python-dev python-pip zlib1g-dev libcurl4-openssl-dev
+sudo apt-get install -y build-essential git autoconf automake libtool python-dev python-pip zlib1g-dev libcurl4-openssl-dev python-daemon
 
 sudo pip install dnslib
 ```

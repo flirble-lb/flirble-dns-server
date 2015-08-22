@@ -3,6 +3,9 @@
 # Flirble DNS Server
 # Lat/long distance functions
 
+import os, logging
+log = logging.getLogger(os.path.basename(__file__))
+
 import sys, time
 import threading
 import geoip2.database
@@ -46,7 +49,7 @@ class Geo(object):
 			with self.lock:
 				city = self.geodb.city(client)
 		except:
-			print "Can't do city lookup on %s" % client
+			log.error("Can't do city lookup on '%s'" % client)
 			return False
 
 		lat = city.location.latitude
@@ -78,7 +81,7 @@ class Geo(object):
 			elif '.' in client:
 				val = int(client.split('.')[-1])
 			else:
-				raise Exception("Badly formatted IP address: %s" % client)
+				raise Exception("Badly formatted IP address: '%s'" % client)
 
 			idx = val % len(ranked)
 			ranked = [ranked[idx]]

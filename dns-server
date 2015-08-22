@@ -1,7 +1,11 @@
 #!/usr/bin/env python
 # Flirble DNS Server
 
+import os, logging
+log = logging.getLogger(os.path.basename(__file__))
+
 import argparse, sys
+import daemon
 import FlirbleDNSServer as fdns
 
 ADDRESS = '::'
@@ -10,20 +14,37 @@ ZONES = "zones.json"
 SERVERS = "servers.json"
 GEODB = "/usr/local/share/GeoIP/GeoLite2-City.mmdb"
 
+
 parser = argparse.ArgumentParser(description="Flirble DNS Server")
-parser.add_argument("-d", "--debug", default=fdns.debug, action="store_true", help="Print diagnostic data. [%s]" % str(fdns.debug))
-parser.add_argument("-a", "--address", metavar="ip-address", default=ADDRESS, help="IP address to bind to. The default binds to the wildcard for both IPv4 and IPv6. [%s]" % ADDRESS)
-parser.add_argument("-p", "--port", metavar="number", default=PORT, type=int, help="TCP and UDP port number to listen on. [%d]" % PORT)
-parser.add_argument("-z", "--zones", metavar="filename", default=ZONES, help="Zones JSON file. [%s]" % ZONES)
-parser.add_argument("-s", "--servers", metavar="filename", default=SERVERS, help="Servers JSON file. [%s]" % SERVERS)
-parser.add_argument("-g", "--geodb", metavar="filename", default=GEODB, help="GeoIP City database file to use. [%s]" % GEODB)
+parser.add_argument("-f", "--foreground", default=False, action="store_true", help="Don't daemonize, stay in the foreground. Implies --debug. [False]")
+parser.add_argument("-d", "--debug", default=fdns.debug, action="store_true", help="Print extra diagnostic data. Implies --log-level=debug. [%s]" % str(fdns.debug))
+parser.add_argument("--log-file", metavar="filename", default=None, help="File to send logging output to. [stderr]")
+parser.add_argument("--log-level", default="info", choices=["debug", "info", "warning", "error", "critical"], help="Logging level. [info]")
+parser.add_argument("--address", metavar="ip-address", default=ADDRESS, help="IP address to bind to. The default binds to the wildcard for both IPv4 and IPv6. [%s]" % ADDRESS)
+parser.add_argument("--port", metavar="number", default=PORT, type=int, help="TCP and UDP port number to listen on. [%d]" % PORT)
+parser.add_argument("--zones", metavar="filename", default=ZONES, help="Zones JSON file. [%s]" % ZONES)
+parser.add_argument("--servers", metavar="filename", default=SERVERS, help="Servers JSON file. [%s]" % SERVERS)
+parser.add_argument("--geodb", metavar="filename", default=GEODB, help="GeoIP City database file to use. [%s]" % GEODB)
 
 args = parser.parse_args()
 
 fdns.debug = args.debug
 if fdns.debug:
-	print "Running DNS server on %s port %d" % (args.address, args.port)
+	args.log_level = "debug"
+	args.foreground = True
+
+logging.basicConfig(filename=args.log_file, level=getattr(logging, args.log_level.upper(), None))
+
+preserve_files = []
+preserve_files.append(log.root.handlers[0].stream.fileno())
+
+
+log.info("Running DNS server on %s port %d" % (args.address, args.port))
+log.error("test")
+if args.foreground is False:
+	ctx = daemon.DaemonContext()
+	ctx.preserve_files = preserve_files
+	#ctx.open()
 
 server = fdns.Server(args.address, args.port, args.zones, args.servers, args.geodb)
 server.run()
-

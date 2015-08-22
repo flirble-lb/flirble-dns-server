@@ -2,6 +2,9 @@
 # Flirble DNS Server
 # Lat/long distance functions
 
+import logging
+log = logging.getLogger(__file__)
+
 import math
 
 GCS_DISTANCE_PRECISION = 50.0

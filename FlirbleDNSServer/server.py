@@ -2,6 +2,9 @@
 # Flirble DNS Server
 # Main server
 
+import os, logging
+log = logging.getLogger(os.path.basename(__file__))
+
 import sys, threading, time
 import SocketServer
 
@@ -23,15 +26,20 @@ class Server(object):
         request = fdns.Request(zones=zones, servers=servers, geo=geo)
 
         self.servers = []
+        log.debug("Initializing UDP server for %s port %s." % (address, port))
         self.servers.append(fdns.UDPServer((address, port), fdns.UDPRequestHandler, request))
+        log.debug("Initializing TCP server for %s port %s." % (address, port))
         self.servers.append(fdns.TCPServer((address, port), fdns.TCPRequestHandler, request))
 
 
     def run(self):
+        log.debug("Starting TCP and UDP servers.")
         for s in self.servers:
             thread = threading.Thread(target=s.serve_forever)
             thread.daemon = True
             thread.start()
+
+        log.debug("DNS server started.")
 
         try:
             while 1:
@@ -41,12 +49,13 @@ class Server(object):
         except KeyboardInterrupt:
             pass
         finally:
+            log.debug("Shutting down DNS server.")
             for s in self.servers:
                 s.shutdown()
 
 
 if __name__ == '__main__':
-    print "Running test DNS server on port %d" % (PORT)
+    log.info("Running test DNS server on port %d" % (PORT))
     fdns.debug = True
     server = Server()
     server.run()

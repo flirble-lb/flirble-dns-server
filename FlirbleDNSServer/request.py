@@ -2,6 +2,9 @@
 # Flirble DNS Server
 # Request handler
 
+import os, logging
+log = logging.getLogger(os.path.basename(__file__))
+
 import sys, json
 import dnslib
 
@@ -9,6 +12,17 @@ try: import FlirbleDNSServer as fdns
 except: import __init__ as fdns
 
 DEFAULT_TTL = 30
+
+
+class ZoneLoggingFilter(logging.Filter):
+    def filter(self, record):
+        if hasattr(record, 'zone') and len(record.zone) > 0:
+            lines = map(lambda x: "    "+x, record.zone.split("\n"))
+            record.msg = record.msg + "\n" + "\n".join(lines)
+        return super(ZoneLoggingFilter, self).filter(record)
+
+log.addFilter(ZoneLoggingFilter())
+
 
 class Request(object):
 
@@ -40,7 +54,7 @@ class Request(object):
         request = dnslib.DNSRecord.parse(data)
 
         if fdns.debug:
-            print "Request:\n", request
+            log.debug("Request received:", extra={'zone': str(request)})
 
         qname = str(request.q.qname)
 
@@ -54,7 +68,7 @@ class Request(object):
                 self.handle_geo_dist(zone, request, reply, address)
 
         if fdns.debug:
-            print "Reply:\n", reply
+            log.debug("Reply to send:", extra={'zone': str(reply)})
 
         return reply.pack()
 

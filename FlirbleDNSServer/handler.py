@@ -2,6 +2,9 @@
 # Flirble DNS Server
 # Handlers for data from clients
 
+import os, logging
+log = logging.getLogger(os.path.basename(__file__))
+
 import sys, time, datetime, socket
 import traceback
 import SocketServer
@@ -29,18 +32,16 @@ class BaseRequestHandler(SocketServer.BaseRequestHandler):
     def handle(self):
         if fdns.debug:
             now = datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S.%f')
-            print "\n\n%s request %s (%s %s):" % (self.__class__.__name__[:3],
+            log.debug("%s request %s (%s %s):" % (self.__class__.__name__[:3],
                 now, self.client_address[0],
-                self.client_address[1])
+                self.client_address[1]))
         try:
             data = self.get_data()
-            if fdns.debug:
-                print len(data), data.encode('hex')
             if self.server.response is not None:
                 reply = self.server.response.handler(data, self.client_address)
                 self.send_data(reply)
         except Exception:
-            traceback.print_exc(file=sys.stderr)
+            log.error("Exception handling data: %s" % traceback.format_exc())
 
 
 class UDPRequestHandler(BaseRequestHandler):
