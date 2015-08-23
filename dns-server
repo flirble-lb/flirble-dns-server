@@ -35,16 +35,55 @@ if fdns.debug:
 
 logging.basicConfig(filename=args.log_file, level=getattr(logging, args.log_level.upper(), None))
 
-preserve_files = []
-preserve_files.append(log.root.handlers[0].stream.fileno())
+if args.log_file is None and args.foreground is False:
+    # Use a syslog handler for logging
+    import platform, logging.handlers
+
+    # remove existing handlers
+    while len(log.root.handlers):
+        log.root.removeHandler(log.root.handlers[0])
+
+    # work out the path to the syslog socket
+    path = None
+    for p in ("/dev/log", "/var/run/syslog"):
+        if os.path.exists(p):
+            path = p
+            break
+
+    if path is None:
+        raise Exception("Unable to discover path to the syslog socket")
+
+    # create a syslog handler
+    h = logging.handlers.SysLogHandler(address=path)
+
+    if hasattr(platform, 'mac_ver'):
+        # bit of a hack for macos which filters info and below by default,
+        # and logging doesn't have a 'notice' level.
+        h.priority_map['INFO'] = 'notice'
+        if args.log_level.upper() == 'DEBUG':
+            h.priority_map['DEBUG'] = 'notice'
+
+    # add the syslog handler
+    log.root.addHandler(h)
 
 
 log.info("Running DNS server on %s port %d" % (args.address, args.port))
-log.error("test")
+
 if args.foreground is False:
+	# discover file handles to preserve
+	preserve_files = []
+	for h in log.root.handlers:
+		if hasattr(h, 'stream'):
+			preserve_files.append(h.stream)
+		if hasattr(h, 'socket'):
+			preserve_files.append(h.socket)
+
 	ctx = daemon.DaemonContext()
 	ctx.preserve_files = preserve_files
-	#ctx.open()
+	ctx.open()
 
-server = fdns.Server(args.address, args.port, args.zones, args.servers, args.geodb)
-server.run()
+try:
+    server = fdns.Server(args.address, args.port, args.zones, args.servers, args.geodb)
+    server.run()
+except:
+    log.error("Exception when running the DNS server:\n%s" % traceback.format_exc())
