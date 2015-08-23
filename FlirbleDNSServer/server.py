@@ -22,13 +22,15 @@ class Server(object):
     def __init__(self, address=ADDRESS, port=PORT, zones=None, servers=None, geodb=None):
         super(Server, self).__init__()
 
+        log.debug("Initializing Geo module.")
         geo = fdns.Geo(geodb=geodb)
+        log.debug("Initializing Request module.")
         request = fdns.Request(zones=zones, servers=servers, geo=geo)
 
         self.servers = []
-        log.debug("Initializing UDP server for %s port %s." % (address, port))
+        log.debug("Initializing UDP server for '%s' port %d." % (address, port))
         self.servers.append(fdns.UDPServer((address, port), fdns.UDPRequestHandler, request))
-        log.debug("Initializing TCP server for %s port %s." % (address, port))
+        log.debug("Initializing TCP server for '%s' port %d." % (address, port))
         self.servers.append(fdns.TCPServer((address, port), fdns.TCPRequestHandler, request))
 
 
