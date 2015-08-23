@@ -3,7 +3,7 @@
 try:
     from setuptools import Command, setup
 except ImportError:
-    from distutils.core import Command, setup 
+    from distutils.core import Command, setup
 
 import FlirbleDNSServer
 long_description = FlirbleDNSServer.__doc__.rstrip() + "\n"
@@ -27,6 +27,7 @@ setup(name='FlirbleDNSServer',
       cmdclass = {'readme': GenerateReadme},
       packages = ['FlirbleDNSServer'],
       package_dir = {'FlirbleDNSServer': 'FlirbleDNSServer'},
+      scripts = ['dns-server'],
       requires = ['dnslib (>=0.9.2)', 'geoip2', 'lockfile'],
       license = 'BSD',
       classifiers = [ "Topic :: Internet :: Name Service (DNS)",
