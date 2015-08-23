@@ -5,7 +5,7 @@ import os, logging
 log = logging.getLogger(os.path.basename(__file__))
 
 import argparse, sys, traceback
-import daemon
+import daemon, lockfile.pidlockfile
 import FlirbleDNSServer as fdns
 
 ADDRESS = '::'
@@ -13,12 +13,13 @@ PORT = 8053
 ZONES = "zones.json"
 SERVERS = "servers.json"
 GEODB = "/usr/local/share/GeoIP/GeoLite2-City.mmdb"
-
+PIDFILE = "/var/run/flirble-dns-server.pid"
 
 parser = argparse.ArgumentParser(description="Flirble DNS Server")
 parser.add_argument("-f", "--foreground", default=False, action="store_true", help="Don't daemonize, stay in the foreground. Implies --debug. [False]")
 parser.add_argument("-d", "--debug", default=fdns.debug, action="store_true", help="Print extra diagnostic data. Implies --log-level=debug. [%s]" % str(fdns.debug))
 parser.add_argument("--log-file", metavar="filename", default=None, help="File to send logging output to. [stderr]")
+parser.add_argument("--pid-file", metavar="filename", default=PIDFILE, help="File to store the PID value in when daemonized. [%s]" % PIDFILE)
 parser.add_argument("--log-level", default="info", choices=["debug", "info", "warning", "error", "critical"], help="Logging level. [info]")
 parser.add_argument("--address", metavar="ip-address", default=ADDRESS, help="IP address to bind to. The default binds to the wildcard for both IPv4 and IPv6. [%s]" % ADDRESS)
 parser.add_argument("--port", metavar="number", default=PORT, type=int, help="TCP and UDP port number to listen on. [%d]" % PORT)
@@ -67,7 +68,7 @@ if args.log_file is None and args.foreground is False:
     log.root.addHandler(h)
 
 
-log.info("Running DNS server on '%s' port %d" % (args.address, args.port))
+log.info("Starting DNS server on '%s' port %d" % (args.address, args.port))
 
 if args.foreground is False:
     # discover file handles to preserve
@@ -78,8 +79,12 @@ if args.foreground is False:
         if hasattr(h, 'socket'):
             preserve_files.append(h.socket)
 
+    # create the daemon context
     ctx = daemon.DaemonContext()
+    ctx.umask = 0o027
+    ctx.pidfile = lockfile.pidlockfile.PIDLockFile(args.pid_file)
     ctx.preserve_files = preserve_files
+
     ctx.open()
 
 try:
