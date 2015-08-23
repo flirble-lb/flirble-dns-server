@@ -77,7 +77,7 @@ class Geo(object):
         if len(ranked) > 1:
             # Build a hash from the last octect of the client address
             if ':' in client:
-                val = int(client.split(':')[-1])
+                val = int(client.split(':')[-1], 16)
             elif '.' in client:
                 val = int(client.split('.')[-1])
             else:

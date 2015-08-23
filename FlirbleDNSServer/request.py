@@ -117,7 +117,10 @@ class Request(object):
             servers = self.servers['default']
 
         if self.geo is not None and servers is not None:
-            server = self.geo.find_closest_server(servers, address[0], {})
+            client = address[0]
+            if client.startswith('::ffff:'):
+                client = client[7:]
+            server = self.geo.find_closest_server(servers, client, {})
             if isinstance(server, dict):
                 # Construct A and AAAA replies for this server
                 if 'ipv4' in server and qtype in ('*', 'ANY', 'A'):
