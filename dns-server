@@ -4,7 +4,7 @@
 import os, logging
 log = logging.getLogger(os.path.basename(__file__))
 
-import argparse, sys
+import argparse, sys, traceback
 import daemon
 import FlirbleDNSServer as fdns
 
@@ -67,7 +67,7 @@ if args.log_file is None and args.foreground is False:
     log.root.addHandler(h)
 
 
-log.info("Running DNS server on %s port %d" % (args.address, args.port))
+log.info("Running DNS server on '%s' port %d" % (args.address, args.port))
 
 if args.foreground is False:
     # discover file handles to preserve
@@ -85,5 +85,5 @@ if args.foreground is False:
 try:
     server = fdns.Server(args.address, args.port, args.zones, args.servers, args.geodb)
     server.run()
-except:
+except Exception:
     log.error("Exception when running the DNS server:\n%s" % traceback.format_exc())
