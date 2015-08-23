@@ -37,12 +37,22 @@ class Request(object):
         super(Request, self).__init__()
 
         if zones is not None:
+            if not os.path.exists(zones):
+                log.error("Zones file '%s' does not exist." % zones)
+                raise Exception("Zones file '%s' does not exist." % zones)
+
             self.zones_file = zones
+
             with open(zones, 'r') as f:
                 self.zones = json.load(f)
 
         if servers is not None:
+            if not os.path.exists(servers):
+                log.error("Servers file '%s' does not exist." % servers)
+                raise Exception("Servers file '%s' does not exist." % servers)
+
             self.servers_file = servers
+
             with open(servers, 'r') as f:
                 self.servers = json.load(f)
 
