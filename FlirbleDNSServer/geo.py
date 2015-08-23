@@ -15,76 +15,76 @@ except: import __init__ as fdns
 
 class Geo(object):
 
-	geodb_file = None
-	geodb = None
+    geodb_file = None
+    geodb = None
 
-	lock = None
+    lock = None
 
-	def __init__(self, geodb=None):
-		super(Geo, self).__init__()
+    def __init__(self, geodb=None):
+        super(Geo, self).__init__()
 
-		self.lock = threading.Lock()
+        self.lock = threading.Lock()
 
-		if geodb is not None:
-			self.geodb_file = geodb
-			with self.lock:
-				self.geodb = geoip2.database.Reader(geodb)
-
-
-	def reopen(self):
-		with self.lock:
-			self.geodb.close()
-			self.geodb = geoip2.database.Reader(self.geodb_file)
+        if geodb is not None:
+            self.geodb_file = geodb
+            with self.lock:
+                self.geodb = geoip2.database.Reader(geodb)
 
 
-	def find_closest_server(self, servers, client, params=None):
-		if params is None:
-			params = {}
+    def reopen(self):
+        with self.lock:
+            self.geodb.close()
+            self.geodb = geoip2.database.Reader(self.geodb_file)
 
-		if self.geodb is None:
-			return None
 
-		# Lookup the client address
-		try:
-			with self.lock:
-				city = self.geodb.city(client)
-		except:
-			log.error("Can't do city lookup on '%s'" % client)
-			return False
+    def find_closest_server(self, servers, client, params=None):
+        if params is None:
+            params = {}
 
-		lat = city.location.latitude
-		lon = city.location.longitude
+        if self.geodb is None:
+            return None
 
-		# The shortest distance discovered
-		mindist = 9999999
-		# List of servers found at the shortest distance
-		ranked = []
+        # Lookup the client address
+        try:
+            with self.lock:
+                city = self.geodb.city(client)
+        except:
+            log.error("Can't do city lookup on '%s'" % client)
+            return False
 
-		for server in servers:
-			dist = fdns.gcs_distance((lat, lon), (server['lat'], server['lon']))
+        lat = city.location.latitude
+        lon = city.location.longitude
 
-			if dist <= mindist:
-				if dist < mindist:
-					mindist = dist
-					ranked = []
-				ranked.append(server)
+        # The shortest distance discovered
+        mindist = 9999999
+        # List of servers found at the shortest distance
+        ranked = []
 
-		# Nothing found? Drop out now.
-		if len(ranked) == 0:
-			return False
+        for server in servers:
+            dist = fdns.gcs_distance((lat, lon), (server['lat'], server['lon']))
 
-		# If we have more than one server we need to choose one
-		if len(ranked) > 1:
-			# Build a hash from the last octect of the client address
-			if ':' in client:
-				val = int(client.split(':')[-1])
-			elif '.' in client:
-				val = int(client.split('.')[-1])
-			else:
-				raise Exception("Badly formatted IP address: '%s'" % client)
+            if dist <= mindist:
+                if dist < mindist:
+                    mindist = dist
+                    ranked = []
+                ranked.append(server)
 
-			idx = val % len(ranked)
-			ranked = [ranked[idx]]
+        # Nothing found? Drop out now.
+        if len(ranked) == 0:
+            return False
 
-		return ranked[0]
+        # If we have more than one server we need to choose one
+        if len(ranked) > 1:
+            # Build a hash from the last octect of the client address
+            if ':' in client:
+                val = int(client.split(':')[-1])
+            elif '.' in client:
+                val = int(client.split('.')[-1])
+            else:
+                raise Exception("Badly formatted IP address: '%s'" % client)
+
+            idx = val % len(ranked)
+            ranked = [ranked[idx]]
+
+        return ranked[0]
 

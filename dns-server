@@ -30,8 +30,8 @@ args = parser.parse_args()
 
 fdns.debug = args.debug
 if fdns.debug:
-	args.log_level = "debug"
-	args.foreground = True
+    args.log_level = "debug"
+    args.foreground = True
 
 logging.basicConfig(filename=args.log_file, level=getattr(logging, args.log_level.upper(), None))
 
@@ -70,17 +70,17 @@ if args.log_file is None and args.foreground is False:
 log.info("Running DNS server on %s port %d" % (args.address, args.port))
 
 if args.foreground is False:
-	# discover file handles to preserve
-	preserve_files = []
-	for h in log.root.handlers:
-		if hasattr(h, 'stream'):
-			preserve_files.append(h.stream)
-		if hasattr(h, 'socket'):
-			preserve_files.append(h.socket)
+    # discover file handles to preserve
+    preserve_files = []
+    for h in log.root.handlers:
+        if hasattr(h, 'stream'):
+            preserve_files.append(h.stream)
+        if hasattr(h, 'socket'):
+            preserve_files.append(h.socket)
 
-	ctx = daemon.DaemonContext()
-	ctx.preserve_files = preserve_files
-	ctx.open()
+    ctx = daemon.DaemonContext()
+    ctx.preserve_files = preserve_files
+    ctx.open()
 
 try:
     server = fdns.Server(args.address, args.port, args.zones, args.servers, args.geodb)
