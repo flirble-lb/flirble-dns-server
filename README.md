@@ -3,10 +3,15 @@
 == Ubuntu depdendencies
 
 ```
-sudo apt-get install -y build-essential git autoconf automake libtool python-dev python-pip zlib1g-dev libcurl4-openssl-dev python-daemon python-lockfile
+sudo apt-get install -y build-essential git autoconf automake libtool \
+    python-dev python-pip zlib1g-dev libcurl4-openssl-dev \
+    python-daemon python-lockfile
 
 sudo pip install dnslib
 ```
+
+If the Ubuntu `python-lockfile` package is too old, you may also need to
+`sudo pip install lockfile` to make the pidlockfile method available.
 
 == Setup GeoIP2 database
 
@@ -41,8 +46,14 @@ sudo adduser --system --no-create-home --gecos GeoIP --home /usr/local/share/Geo
 
 sudo chown geoip:geoip /usr/local/share/GeoIP
 
-echo "13 1 * * 1 geoip /usr/local/bin/geoipupdate" > /etc/cron.d/geoipupdate
+echo "13 1 * * 3 geoip /usr/local/bin/geoipupdate" > /etc/cron.d/geoipupdate
 
+sudo -u geoip /usr/local/bin/geoipupdate
+```
+
+== Install the Python bindings for GeoIP2
+
+```
 git clone --recursive https://github.com/maxmind/libmaxminddb.git
 cd libmaxminddb
 ./bootstrap && ./configure && make && sudo make install
