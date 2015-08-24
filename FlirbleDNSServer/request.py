@@ -120,22 +120,30 @@ class Request(object):
             client = address[0]
             if client.startswith('::ffff:'):
                 client = client[7:]
-            server = self.geo.find_closest_server(servers, client, {})
-            if isinstance(server, dict):
-                # Construct A and AAAA replies for this server
-                if 'ipv4' in server and qtype in ('*', 'ANY', 'A'):
-                    addrs = server['ipv4']
-                    if not isinstance(addrs, (list, tuple)):
-                        addrs = [addrs]
-                    for addr in addrs:
-                        reply.add_answer(dnslib.RR(rname=request.q.qname, rtype=dnslib.QTYPE.A, ttl=ttl, rdata=dnslib.A(addr)))
 
-                if 'ipv6' in server and qtype in ('*', 'ANY', 'AAAA'):
-                    addrs = server['ipv6']
-                    if not isinstance(addrs, (list, tuple)):
-                        addrs = [addrs]
-                    for addr in addrs:
-                        reply.add_answer(dnslib.RR(rname=request.q.qname, rtype=dnslib.QTYPE.AAAA, ttl=ttl, rdata=dnslib.AAAA(addr)))
+            if 'params' in zone:
+                params = zone['params']
+            else:
+                params = {}
+
+            servers = self.geo.find_closest_server(servers, client, params)
+
+            if isinstance(servers, list):
+                for server in servers:
+                    # Construct A and AAAA replies for this server
+                    if 'ipv4' in server and qtype in ('*', 'ANY', 'A'):
+                        addrs = server['ipv4']
+                        if not isinstance(addrs, (list, tuple)):
+                            addrs = [addrs]
+                        for addr in addrs:
+                            reply.add_answer(dnslib.RR(rname=request.q.qname, rtype=dnslib.QTYPE.A, ttl=ttl, rdata=dnslib.A(addr)))
+
+                    if 'ipv6' in server and qtype in ('*', 'ANY', 'AAAA'):
+                        addrs = server['ipv6']
+                        if not isinstance(addrs, (list, tuple)):
+                            addrs = [addrs]
+                        for addr in addrs:
+                            reply.add_answer(dnslib.RR(rname=request.q.qname, rtype=dnslib.QTYPE.AAAA, ttl=ttl, rdata=dnslib.AAAA(addr)))
 
                 return True
 
