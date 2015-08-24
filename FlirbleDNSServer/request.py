@@ -68,14 +68,31 @@ class Request(object):
 
         qname = str(request.q.qname)
 
-        reply = dnslib.DNSRecord(dnslib.DNSHeader(id=request.header.id, qr=1, aa=1, ra=1), q=request.q)
+        header = dnslib.DNSHeader(id=request.header.id, qr=1, aa=1, ra=1)
+        reply = dnslib.DNSRecord(header, q=request.q)
 
+        status = None
         if qname in self.zones:
             zone = self.zones[qname]
             if zone['type'] == 'static':
-                self.handle_static(zone, request, reply)
+                status = self.handle_static(zone, request, reply)
             elif zone['type'] == 'geo-dist':
-                self.handle_geo_dist(zone, request, reply, address)
+                status = self.handle_geo_dist(zone, request, reply, address)
+        else:
+            # indicate an error.
+            # in an ideal world we'd say we didn't find it (NXDOMAIN)
+            # but to indicate that we don't allow any recursion it's
+            # better to reply DENIED, if at all.
+            status = None
+
+        if status is None:
+            # Add the denied message
+            header.rcode = dnslib.RCODE.REFUSED
+            pass
+        elif status is False:
+            # Add an error status
+            header.rcode = dnslib.RCODE.SERVFAIL
+            pass
 
         if fdns.debug:
             log.debug("Reply to send:", extra={'zone': str(reply)})
@@ -117,18 +134,23 @@ class Request(object):
             servers = self.servers['default']
 
         if self.geo is not None and servers is not None:
+            # check if we get an ipv6-ebcoded-as-ipv6 address
             client = address[0]
             if client.startswith('::ffff:'):
+                # strip the ipv6 part
                 client = client[7:]
 
+            # if we have paramaters, use them
             if 'params' in zone:
                 params = zone['params']
             else:
                 params = {}
 
+            # go find the closest set of servers to the client address
             servers = self.geo.find_closest_server(servers, client, params)
 
-            if isinstance(servers, list):
+            # Only process the response if it's a list and it has entries
+            if isinstance(servers, list) and len(servers) > 0:
                 for server in servers:
                     # Construct A and AAAA replies for this server
                     if 'ipv4' in server and qtype in ('*', 'ANY', 'A'):
