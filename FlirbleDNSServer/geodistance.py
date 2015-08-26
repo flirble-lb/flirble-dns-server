@@ -19,7 +19,7 @@ them in miles, bounded by the optional precision parameter.
 @param b list A tuple of (lat, long) coordinates.
 @param precision float The rounding to apply to the result. Default is 50.0.
 @returns float The distance between the two coordinates, in miles, rounded
-			to the given precision.
+			down to the given precision.
 """
 def gcs_distance(a, b, precision=GCS_DISTANCE_PRECISION):
 
@@ -31,7 +31,6 @@ def gcs_distance(a, b, precision=GCS_DISTANCE_PRECISION):
     dist = math.degrees(math.acos(dist));
     miles = dist * 60 * 1.1515;
 
-    miles = miles / precision;
-    miles = int(miles) * precision;
+    miles = (miles // precision) * precision
 
-    return int(miles);
+    return miles;

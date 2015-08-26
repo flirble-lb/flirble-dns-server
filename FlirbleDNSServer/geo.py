@@ -86,9 +86,9 @@ class Geo(object):
                 * maxload When load information is available, the maximum
                     load for a server to be retained in the candidate list.
                 * precision The precision at which distances are calculated.
-                    In effect, distances are rounded by this value, for
-                    example "50" would mean that distances are rounded to the
-                    nearest 50. The default is 50.
+                    In effect, distances are rounded down by this value, for
+                    example "50" would mean that distances are rounded down
+                    to the nearest 50. The default is 50.
                 * maxreplies Sets the number of servers to include in a reply.
                     The default is 1.
     """
