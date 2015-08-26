@@ -11,19 +11,49 @@ import SocketServer
 try: import FlirbleDNSServer as fdns
 except: import __init__ as fdns
 
-ADDRESS = ''
+"""Default local bind address."""
+ADDRESS = '::'
+"""Default local bind port."""
 PORT = 8053
 
 
+"""
+The DNS Server.
+
+Initializes various things then spawns a thread each for the UDP and TCP
+services.
+"""
 class Server(object):
 
+    """The list of SocketServer instances to launch threads for."""
     servers = None
 
+    """
+    Initializes the DNS server.
+
+    Creates a Geo object with the path to the GeoIP database.
+
+    Creates a Request handler with the zones and servers files, and the
+                Geo reference.
+
+    Then creates TCP and UDP servers, which opens sockets and binds them
+    to the given address and port.
+
+    @param address str The local address to bind to. Default is "::".
+    @param port int The local port number to vind to. Default is "8053".
+    @param zones str The zones file that the Request handler should load.
+                Default is None.
+    @param server str The servers file that the Request handler should load.
+                Default is None.
+    @param geodb str The Maxmind GeoIP database that the Geo class should
+                load. Default is None.
+    """
     def __init__(self, address=ADDRESS, port=PORT, zones=None, servers=None, geodb=None):
         super(Server, self).__init__()
 
         log.debug("Initializing Geo module.")
         geo = fdns.Geo(geodb=geodb)
+
         log.debug("Initializing Request module.")
         request = fdns.Request(zones=zones, servers=servers, geo=geo)
 
@@ -34,8 +64,14 @@ class Server(object):
         self.servers.append(fdns.TCPServer((address, port), fdns.TCPRequestHandler, request))
 
 
+    """
+    Starts the threads and runs the servers. Returns once all services have
+    been stopped, either by Exception or ^C.
+    """
     def run(self):
         log.debug("Starting TCP and UDP servers.")
+
+        # Start the threads.
         for s in self.servers:
             thread = threading.Thread(target=s.serve_forever)
             thread.daemon = True
@@ -45,9 +81,9 @@ class Server(object):
 
         try:
             while 1:
+                # This is the idle loop.
                 time.sleep(1)
-                sys.stderr.flush()
-                sys.stdout.flush()
+
         except KeyboardInterrupt:
             pass
         finally:

@@ -4,11 +4,13 @@
 Flirble DNS Server
 ------------------
 
-A DNS server that does some sort of crude loadbalancing.
+A DNS server that does some sort of crude Gepgraphically-aware loadbalancing.
 """
 
+"""Flirble DNS Server version number."""
 version = "0.1"
 
+"""Whether to emit extra diagnostic output."""
 debug = False
 
 from server import *

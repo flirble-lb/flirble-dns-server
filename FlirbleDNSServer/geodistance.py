@@ -7,9 +7,20 @@ log = logging.getLogger(__file__)
 
 import math
 
+"""Default precision with which to return distance calculations."""
 GCS_DISTANCE_PRECISION = 50.0
 
 
+"""
+Given two global coordinates, calculate the surface distance between
+them in miles, bounded by the optional precision parameter.
+
+@param a list A tuple of (lat, long) coordinates.
+@param b list A tuple of (lat, long) coordinates.
+@param precision float The rounding to apply to the result. Default is 50.0.
+@returns float The distance between the two coordinates, in miles, rounded
+			to the given precision.
+"""
 def gcs_distance(a, b, precision=GCS_DISTANCE_PRECISION):
 
     (lat1, lon1) = a

@@ -11,9 +11,12 @@ import dnslib
 try: import FlirbleDNSServer as fdns
 except: import __init__ as fdns
 
+"""Default DNS record TTL, if one is not given in the zone definition."""
 DEFAULT_TTL = 30
 
 
+"""A logging filter used when dumping the received and sent DNS packets; this
+   filter handes the multiline output of dnslib when serializing such data."""
 class ZoneLoggingFilter(logging.Filter):
     def filter(self, record):
         if hasattr(record, 'zone') and len(record.zone) > 0:
@@ -24,6 +27,26 @@ class ZoneLoggingFilter(logging.Filter):
 log.addFilter(ZoneLoggingFilter())
 
 
+"""
+
+Handles a DNS request.
+
+This parses a DNS packet and then answers the query it contains.
+
+Each instance is configured with a zones file and a servers file, both
+JSON encoded, that supply information about the DNS zones we will return
+replies for.
+
+This supports two types of zone currently:
+
+* A static zone that serves up fixed data. This supports most common DNS
+  records.
+* A dynamic geo-distance zone. The zone definition indicates a set of servers
+  whose geographic coordinates are compared with those of a GeoIP lookup
+  of the IP address of the requesting DNS client. With this method, the
+  servers are ranked into a group of the closest and then one or more of that
+  group are selected and used in the reply.
+"""
 class Request(object):
 
     zones_file = None
@@ -33,6 +56,14 @@ class Request(object):
     zones = None
     servers = None
 
+    """
+    @param zones str The name of the zones configuration file. This must exist
+                at instance creation and be a valid JSON file.
+    @param servers str The name of the servers configuration file. This mys
+                exist at instance creation and be a valid JSON file.
+    @param geo Geo An instance of a Geo object that can be used to perform
+                geographic lookups and calculations.
+    """
     def __init__(self, zones=None, servers=None, geo=None):
         super(Request, self).__init__()
 
@@ -60,6 +91,17 @@ class Request(object):
             self.geo = geo
 
 
+    """
+    Process a DNS query by parsing a DNS packet and, depending on the
+    zone the request is for, process it and return a DNS packet to be used
+    as the reply.
+
+    @params data str A raw, complete DNS datagram.
+    @params address str The IP address from which the datagram originated.
+                This can be either an IPv4 or an IPv6 address. It can also be
+                an IPv4-encoded-as-IPv6 address like "::ffff:a.b.c.d".
+    @returns str A raw, complete DNS reply packet.
+    """
     def handler(self, data, address):
         request = dnslib.DNSRecord.parse(data)
 
@@ -100,6 +142,18 @@ class Request(object):
         return reply.pack()
 
 
+    """
+    Handles a request for a static DNS zone.
+
+    This uses zone record details in the zone to formulate a reply to the
+    query. The supported DNS resource records are documented in the method
+    construct_rdata().
+
+    @param zone str The zone name for which we are to construct a reply.
+    @param request DNSRecord The parsed DNS request.
+    @param reply DNSRecord The DNS reply to which we add our records.
+    @return bool This function always returns True.
+    """
     def handle_static(self, zone, request, reply):
         qtype = dnslib.QTYPE[request.q.qtype]
 
@@ -116,6 +170,34 @@ class Request(object):
         return True
 
 
+    """
+    Handles a request for a Geo-distance dynamic DNS zone.
+
+    The zone indicates which set of servers it should use as candidate
+    destinations to fulfil the request with.
+
+    Much of the server selection is performed by the find_closest_server()
+    method in the Geo class.
+
+    For each winning servers addresses an IPv4 (A record) and IPv6 (AAAA
+    record) are then assembled into the response. No other resource types are
+    currently supported.
+
+    If for whatever reason no dynamic response was achievable (such as the
+    GeoIP lookup failing or all candidate servers are filtered because of
+    load issues) then, if the zone configuration provides them, fallback
+    a static response will occur using the handle_static() method.
+
+    @param zone str The zone name for which we are to construct a reply.
+    @param request DNSRecord The parsed DNS request.
+    @param reply DNSRecord The DNS reply to which we add our records.
+    @params address str The IP address from which the datagram originated.
+                This can be either an IPv4 or an IPv6 address. It can also be
+                an IPv4-encoded-as-IPv6 address like "::ffff:a.b.c.d".
+    @return bool Returns True on success and False if we were unable to find
+                a winning set of servers and no static fallback was
+                available.
+    """
     def handle_geo_dist(self, zone, request, reply, address):
         qtype = dnslib.QTYPE[request.q.qtype]
 
@@ -177,6 +259,25 @@ class Request(object):
         return False
 
 
+    """
+    Constructs a dnslib resource record object from zone information.
+
+    This method supports these DNS resource records:
+    * SOA
+    * A
+    * AAAA
+    * NS
+    * CNAME
+    * TXT
+    * PTR
+    * MX
+
+    Any other RR type will elicit a return value of None.
+
+    @param rr hash The input zone information for a single resource record.
+    @returns DNSRecord Returns a subclassed DNSRecord of the appropriate
+                type or None if the type provided in rr is not supported.
+    """
     def construct_rdata(self, rr):
         t = rr['type']
         if t == "SOA":

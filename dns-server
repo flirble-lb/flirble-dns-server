@@ -8,19 +8,24 @@ import argparse, sys, traceback
 import daemon, lockfile.pidlockfile
 import FlirbleDNSServer as fdns
 
+# Defaults for the command line options.
+FOREGROUND = False
+DEBUG = fdns.debug
+LOGFILE = None
+LOGLEVEL = "info"
+PIDFILE = "/var/run/flirble-dns-server.pid"
 ADDRESS = '::'
 PORT = 8053
 ZONES = "zones.json"
 SERVERS = "servers.json"
 GEODB = "/usr/local/share/GeoIP/GeoLite2-City.mmdb"
-PIDFILE = "/var/run/flirble-dns-server.pid"
 
-parser = argparse.ArgumentParser(description="Flirble DNS Server")
-parser.add_argument("-f", "--foreground", default=False, action="store_true", help="Don't daemonize, stay in the foreground. Implies --debug. [False]")
-parser.add_argument("-d", "--debug", default=fdns.debug, action="store_true", help="Print extra diagnostic data. Implies --log-level=debug. [%s]" % str(fdns.debug))
-parser.add_argument("--log-file", metavar="filename", default=None, help="File to send logging output to. [stderr]")
+parser = argparse.ArgumentParser(description="Flirble DNS Server version %s." % fdns.version)
+parser.add_argument("-f", "--foreground", default=FOREGROUND, action="store_true", help="Don't daemonize, stay in the foreground. [%s]" % str(FOREGROUND))
+parser.add_argument("-d", "--debug", default=DEBUG, action="store_true", help="Print extra diagnostic data. Implies --foreground and --log-level=debug. [%s]" % str(DEBUG))
+parser.add_argument("--log-file", metavar="filename", default=LOGFILE, help="File to send logging output to. [%s]" % "stderr" if LOGFILE is None else LOGFILE)
+parser.add_argument("--log-level", default=LOGLEVEL, choices=["debug", "info", "warning", "error", "critical"], help="Logging level. [%s]" % LOGLEVEL.lower())
 parser.add_argument("--pid-file", metavar="filename", default=PIDFILE, help="File to store the PID value in when daemonized. [%s]" % PIDFILE)
-parser.add_argument("--log-level", default="info", choices=["debug", "info", "warning", "error", "critical"], help="Logging level. [info]")
 parser.add_argument("--address", metavar="ip-address", default=ADDRESS, help="IP address to bind to. The default binds to the wildcard for both IPv4 and IPv6. [%s]" % ADDRESS)
 parser.add_argument("--port", metavar="number", default=PORT, type=int, help="TCP and UDP port number to listen on. [%d]" % PORT)
 parser.add_argument("--zones", metavar="filename", default=ZONES, help="Zones JSON file. [%s]" % ZONES)
@@ -88,6 +93,7 @@ if args.foreground is False:
     ctx.open()
 
 try:
+    # Fire it all up!
     server = fdns.Server(args.address, args.port, args.zones, args.servers, args.geodb)
     server.run()
 except Exception:

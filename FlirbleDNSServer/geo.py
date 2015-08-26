@@ -13,6 +13,12 @@ import geoip2.database
 try: import FlirbleDNSServer as fdns
 except: import __init__ as fdns
 
+"""
+Handles Geographic lookup and related operations.
+
+This class uses a lock to serialize all database operations in order to
+ensure threadsafe operation.
+"""
 class Geo(object):
 
     geodb_file = None
@@ -20,6 +26,10 @@ class Geo(object):
 
     lock = None
 
+    """
+    @param geodb str The path to a Maxmind GeoIP2 Cities database. This must
+                exist at instantiation otherwise this class will not function.
+    """
     def __init__(self, geodb=None):
         super(Geo, self).__init__()
 
@@ -31,12 +41,57 @@ class Geo(object):
                 self.geodb = geoip2.database.Reader(geodb)
 
 
+    """
+    Closes and reopens the Maxmind GeoIP2 database. Typically this is
+    performed to access a newer version of the database. If reopening the
+    database fails this class is rendered inoperable.
+    """
     def reopen(self):
         with self.lock:
             self.geodb.close()
             self.geodb = geoip2.database.Reader(self.geodb_file)
 
 
+    """
+    Attempts to find the server closest to the client.
+
+    If load data is available and the zone specifies a limit, the set of
+    servers is filtered based on their reported load.
+
+    A GeoIP lookup is performed on the client address and then the distance
+    between it and the coordinates of each of a set of servers is used to
+    determine which of those servers are closest.
+
+
+    The precision parameter is used to deliberately reduce precision of the
+    distance value to allow servers that are of similar distance to be
+    included in the selection.
+
+    The configuration may also specify how many servers in the winning
+    group should be included in the reply. The default is one, but if the
+    round-robin heuristic of DNS client resolvers is desired then more can
+    be included.
+
+    A simple hash is calculated from the client address so that when there is
+    more than one server in the final list, a client is generally given the
+    same server, or subset of servers, in subsequent queries. This is
+    probably considered a desirable trait.
+
+    @param servers hash A set of candidate servers. Each should provide
+                their lat and lon coordinates.
+    @param client str The IPv4 or IPv6 address of the client on which a GeoIP
+                lookup will be performed.
+    @param params hash A set of optional parameters used to influence the
+                selection process.
+                * maxload When load information is available, the maximum
+                    load for a server to be retained in the candidate list.
+                * precision The precision at which distances are calculated.
+                    In effect, distances are rounded by this value, for
+                    example "50" would mean that distances are rounded to the
+                    nearest 50. The default is 50.
+                * maxreplies Sets the number of servers to include in a reply.
+                    The default is 1.
+    """
     def find_closest_server(self, servers, client, params=None):
         if params is None:
             params = {}
