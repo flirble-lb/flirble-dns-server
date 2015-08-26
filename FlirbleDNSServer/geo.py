@@ -68,6 +68,11 @@ class Geo(object):
                     # consider it as a candidate
                     continue
 
+            # use default precision unless one is given in the parameters
+            precision = fdns.GCS_DISTANCE_PRECISION
+            if 'precision' in params:
+                precision = params['precision']
+
             # calculate the distance between two lat,long pairs
             dist = fdns.gcs_distance((lat, lon), (server['lat'], server['lon']))
 
