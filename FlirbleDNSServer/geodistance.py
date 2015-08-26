@@ -10,7 +10,7 @@ import math
 GCS_DISTANCE_PRECISION = 50.0
 
 
-def gcs_distance(a, b):
+def gcs_distance(a, b, precision=GCS_DISTANCE_PRECISION):
 
     (lat1, lon1) = a
     (lat2, lon2) = b
@@ -20,7 +20,7 @@ def gcs_distance(a, b):
     dist = math.degrees(math.acos(dist));
     miles = dist * 60 * 1.1515;
 
-    miles = miles / GCS_DISTANCE_PRECISION;
-    miles = int(miles) * GCS_DISTANCE_PRECISION;
+    miles = miles / precision;
+    miles = int(miles) * precision;
 
     return int(miles);
