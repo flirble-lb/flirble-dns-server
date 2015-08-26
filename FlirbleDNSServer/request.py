@@ -28,7 +28,6 @@ log.addFilter(ZoneLoggingFilter())
 
 
 """
-
 Handles a DNS request.
 
 This parses a DNS packet and then answers the query it contains.
@@ -109,32 +108,19 @@ class Request(object):
             log.debug("Request received:", extra={'zone': str(request)})
 
         qname = str(request.q.qname)
+        qtype = dnslib.QTYPE[request.q.qtype]
 
         header = dnslib.DNSHeader(id=request.header.id, qr=1, aa=1, ra=1)
         reply = dnslib.DNSRecord(header, q=request.q)
 
-        status = None
-        if qname in self.zones:
-            zone = self.zones[qname]
-            if zone['type'] == 'static':
-                status = self.handle_static(zone, request, reply)
-            elif zone['type'] == 'geo-dist':
-                status = self.handle_geo_dist(zone, request, reply, address)
-        else:
-            # indicate an error.
-            # in an ideal world we'd say we didn't find it (NXDOMAIN)
-            # but to indicate that we don't allow any recursion it's
-            # better to reply DENIED, if at all.
-            status = None
+        status = self.handle_zone(qname, qtype, reply, address, [])
 
         if status is None:
             # Add the denied message
             header.rcode = dnslib.RCODE.REFUSED
-            pass
         elif status is False:
             # Add an error status
             header.rcode = dnslib.RCODE.SERVFAIL
-            pass
 
         if fdns.debug:
             log.debug("Reply to send:", extra={'zone': str(reply)})
@@ -143,30 +129,71 @@ class Request(object):
 
 
     """
+    If the zone 'qname' exists, dispatches to the correct method to handle it.
+
+    @param qname str The record name.
+    @param qtype str|tuple The record type(s) being asked for.
+    @param reply DNSRecord The DNS reply to which we add our records.
+    @params address str The IP address from which the datagram originated.
+                This can be either an IPv4 or an IPv6 address. It can also be
+                an IPv4-encoded-as-IPv6 address like "::ffff:a.b.c.d".
+    @param chain list A chain of qnames that have been queried already in
+                this recursion tree.
+    @return bool Returns True on success and False if we were unable to find
+                a winning set of servers and no static fallback was
+                available.
+    """
+    def handle_zone(self, qname, qtype, reply, address, chain):
+        # handle recursion checking
+        if qname in chain:
+            return
+        chain.append(qname)
+
+        # Assume that if this is the first query in the chain this should be
+        # an authoritative answer. Otherwise it's an additional answer.
+        if len(chain) <= 1:
+            fn = reply.add_auth
+        else:
+            fn = reply.add_ar
+
+        # Dispatch appropriately.
+        if qname in self.zones:
+            zone = self.zones[qname]
+            if zone['type'] == 'static':
+                return self.handle_static(qname, qtype, zone, reply, address, chain, fn)
+
+            if zone['type'] == 'geo-dist':
+                return self.handle_geo_dist(qname, qtype, zone, reply, address, chain, fn)
+
+
+    """
     Handles a request for a static DNS zone.
 
     This uses zone record details in the zone to formulate a reply to the
     query. The supported DNS resource records are documented in the method
-    construct_rdata().
+    _construct_rdata().
 
-    @param zone str The zone name for which we are to construct a reply.
-    @param request DNSRecord The parsed DNS request.
+    @param qname str The record name.
+    @param qtype str|tuple The record type(s) being asked for.
     @param reply DNSRecord The DNS reply to which we add our records.
+    @params address str The IP address from which the datagram originated.
+                This can be either an IPv4 or an IPv6 address. It can also be
+                an IPv4-encoded-as-IPv6 address like "::ffff:a.b.c.d".
+    @param chain list A chain of qnames that have been queried already in
+                this recursion tree.
     @return bool This function always returns True.
     """
-    def handle_static(self, zone, request, reply):
-        qtype = dnslib.QTYPE[request.q.qtype]
-
+    def handle_static(self, qname, qtype, zone, reply, address, chain, fn):
         ttl = DEFAULT_TTL
         if "ttl" in zone:
             ttl = int(zone['ttl'])
 
         for rr in zone['rr']:
-            if qtype in ('*', 'ANY', rr['type']):
-                rdata = self.construct_rdata(rr)
+            if self._check_qtype(qtype, ('*', 'ANY', rr['type'])):
+                rdata = self._construct_rdata(rr)
                 rtype = getattr(dnslib.QTYPE, rr['type'])
-                reply.add_auth(dnslib.RR(rname=request.q.qname, rtype=rtype, ttl=ttl, rdata=rdata))
-                self.check_additional(rdata, reply)
+                fn(dnslib.RR(rname=qname, rtype=rtype, ttl=ttl, rdata=rdata))
+                self._check_additional(rdata, reply, address, chain)
 
         return True
 
@@ -189,19 +216,19 @@ class Request(object):
     load issues) then, if the zone configuration provides them, fallback
     a static response will occur using the handle_static() method.
 
-    @param zone str The zone name for which we are to construct a reply.
-    @param request DNSRecord The parsed DNS request.
+    @param qname str The record name.
+    @param qtype str|tuple The record type(s) being asked for.
     @param reply DNSRecord The DNS reply to which we add our records.
     @params address str The IP address from which the datagram originated.
                 This can be either an IPv4 or an IPv6 address. It can also be
                 an IPv4-encoded-as-IPv6 address like "::ffff:a.b.c.d".
+    @param chain list A chain of qnames that have been queried already in
+                this recursion tree.
     @return bool Returns True on success and False if we were unable to find
                 a winning set of servers and no static fallback was
                 available.
     """
-    def handle_geo_dist(self, zone, request, reply, address):
-        qtype = dnslib.QTYPE[request.q.qtype]
-
+    def handle_geo_dist(self, qname, qtype, zone, reply, address, chain, fn):
         ttl = DEFAULT_TTL
         if "ttl" in zone:
             ttl = int(zone['ttl'])
@@ -236,29 +263,42 @@ class Request(object):
             if isinstance(servers, list) and len(servers) > 0:
                 for server in servers:
                     # Construct A and AAAA replies for this server
-                    if 'ipv4' in server and qtype in ('*', 'ANY', 'A'):
+                    if 'ipv4' in server and self._check_qtype(qtype, ('*', 'ANY', 'A')):
                         addrs = server['ipv4']
                         if not isinstance(addrs, (list, tuple)):
                             addrs = [addrs]
                         for addr in addrs:
-                            reply.add_auth(dnslib.RR(rname=request.q.qname, rtype=dnslib.QTYPE.A, ttl=ttl, rdata=dnslib.A(addr)))
+                            fn(dnslib.RR(rname=qname, rtype=dnslib.QTYPE.A, ttl=ttl, rdata=dnslib.A(addr)))
 
-                    if 'ipv6' in server and qtype in ('*', 'ANY', 'AAAA'):
+                    if 'ipv6' in server and self._check_qtype(qtype, ('*', 'ANY', 'AAAA')):
                         addrs = server['ipv6']
                         if not isinstance(addrs, (list, tuple)):
                             addrs = [addrs]
                         for addr in addrs:
-                            reply.add_auth(dnslib.RR(rname=request.q.qname, rtype=dnslib.QTYPE.AAAA, ttl=ttl, rdata=dnslib.AAAA(addr)))
+                            fn(dnslib.RR(rname=qname, rtype=dnslib.QTYPE.AAAA, ttl=ttl, rdata=dnslib.AAAA(addr)))
 
                 return True
 
         # Fallthrough if geo stuff doesn't work...
         if 'rr' in zone:
-            return self.handle_static(zone, request, reply)
+            return self.handle_static(qname, qtype, zone, reply, address, chain, fn)
 
         # Fallthrough on failure...
         return False
 
+
+    """
+    Helper method to check whether a requested qtype is in a list of those
+    we answer to.
+    """
+    def _check_qtype(self, qtype, dtype):
+        if isinstance(qtype, str):
+            return qtype in dtype
+        if isinstance(qtype, tuple) or isinstance(qtype, list):
+            for t in qtype:
+                if t in dtype:
+                    return True
+        return False
 
     """
     Constructs a dnslib RD (rdata) resource record object from zone
@@ -280,7 +320,7 @@ class Request(object):
     @returns RD Returns a subclassed RD (rdata) of the appropriate
                 type or None if the type provided in rr is not supported.
     """
-    def construct_rdata(self, rr):
+    def _construct_rdata(self, rr):
         t = rr['type']
         if t == "SOA":
             return dnslib.SOA(mname=rr['mname'], rname=rr['rname'], times=rr['times'])
@@ -302,38 +342,19 @@ class Request(object):
 
     This currently applies to 'MX', 'CNAME' and 'NS' records.
 
-    This also only returns static data currently.
-
     @param rdata RD An rdata object of the resource record to check.
-    @param reply DNSRecord into which any additional resource records are
-                added.
+    @param reply DNSRecord The DNS reply to which we add our records.
+    @params address str The IP address from which the datagram originated.
+                This can be either an IPv4 or an IPv6 address. It can also be
+                an IPv4-encoded-as-IPv6 address like "::ffff:a.b.c.d".
+    @param chain list A chain of qnames that have been queried already in
+                this recursion tree.
     """
-    def check_additional(self, rdata, reply):
+    def _check_additional(self, rdata, reply, address, chain):
         rtype = rdata.__class__.__name__
         if rtype in ('MX', 'CNAME', 'NS'):
             # Get the label
             name = str(rdata.label)
             if name in self.zones:
-                self.add_additional(name, self.zones[name], reply)
+                self.handle_zone(name, ('A', 'AAAA'), reply, address, chain)
 
-
-    """
-    Add additional records to a DNSRecord reply.
-
-    @param name str The record name to add.
-    @param zone dict The zone data to extract details from.
-    @param reply DNSRecord into which additional resource records are added.
-    """
-    def add_additional(self, name, zone, reply):
-        if zone['type'] != 'static':
-            return
-
-        ttl = DEFAULT_TTL
-        if "ttl" in zone:
-            ttl = int(zone['ttl'])
-
-        for rr in zone['rr']:
-            if rr['type'] in ('A', 'AAAA'):
-                rdata = self.construct_rdata(rr)
-                rtype = getattr(dnslib.QTYPE, rr['type'])
-                reply.add_ar(dnslib.RR(rname=name, rtype=rtype, ttl=ttl, rdata=rdata))
