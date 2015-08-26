@@ -165,7 +165,8 @@ class Request(object):
             if qtype in ('*', 'ANY', rr['type']):
                 rdata = self.construct_rdata(rr)
                 rtype = getattr(dnslib.QTYPE, rr['type'])
-                reply.add_answer(dnslib.RR(rname=request.q.qname, rtype=rtype, ttl=ttl, rdata=rdata))
+                reply.add_auth(dnslib.RR(rname=request.q.qname, rtype=rtype, ttl=ttl, rdata=rdata))
+                self.check_additional(rdata, reply)
 
         return True
 
@@ -216,7 +217,7 @@ class Request(object):
             servers = self.servers['default']
 
         if self.geo is not None and servers is not None:
-            # check if we get an ipv6-ebcoded-as-ipv6 address
+            # check if we were given an ipv6-encoded-as-ipv6 address
             client = address[0]
             if client.startswith('::ffff:'):
                 # strip the ipv6 part
@@ -240,14 +241,14 @@ class Request(object):
                         if not isinstance(addrs, (list, tuple)):
                             addrs = [addrs]
                         for addr in addrs:
-                            reply.add_answer(dnslib.RR(rname=request.q.qname, rtype=dnslib.QTYPE.A, ttl=ttl, rdata=dnslib.A(addr)))
+                            reply.add_auth(dnslib.RR(rname=request.q.qname, rtype=dnslib.QTYPE.A, ttl=ttl, rdata=dnslib.A(addr)))
 
                     if 'ipv6' in server and qtype in ('*', 'ANY', 'AAAA'):
                         addrs = server['ipv6']
                         if not isinstance(addrs, (list, tuple)):
                             addrs = [addrs]
                         for addr in addrs:
-                            reply.add_answer(dnslib.RR(rname=request.q.qname, rtype=dnslib.QTYPE.AAAA, ttl=ttl, rdata=dnslib.AAAA(addr)))
+                            reply.add_auth(dnslib.RR(rname=request.q.qname, rtype=dnslib.QTYPE.AAAA, ttl=ttl, rdata=dnslib.AAAA(addr)))
 
                 return True
 
@@ -260,7 +261,8 @@ class Request(object):
 
 
     """
-    Constructs a dnslib resource record object from zone information.
+    Constructs a dnslib RD (rdata) resource record object from zone
+    information.
 
     This method supports these DNS resource records:
     * SOA
@@ -275,7 +277,7 @@ class Request(object):
     Any other RR type will elicit a return value of None.
 
     @param rr hash The input zone information for a single resource record.
-    @returns DNSRecord Returns a subclassed DNSRecord of the appropriate
+    @returns RD Returns a subclassed RD (rdata) of the appropriate
                 type or None if the type provided in rr is not supported.
     """
     def construct_rdata(self, rr):
@@ -291,3 +293,47 @@ class Request(object):
             return cls(rr['value'])
 
         return None
+
+
+    """
+    Given an RD (rdata) object, check if it refers to some detail we have
+    stored locally. If so, add that as an additional record; it may save
+    a futher roundtrip between the client and us to fetch it.
+
+    This currently applies to 'MX', 'CNAME' and 'NS' records.
+
+    This also only returns static data currently.
+
+    @param rdata RD An rdata object of the resource record to check.
+    @param reply DNSRecord into which any additional resource records are
+                added.
+    """
+    def check_additional(self, rdata, reply):
+        rtype = rdata.__class__.__name__
+        if rtype in ('MX', 'CNAME', 'NS'):
+            # Get the label
+            name = str(rdata.label)
+            if name in self.zones:
+                self.add_additional(name, self.zones[name], reply)
+
+
+    """
+    Add additional records to a DNSRecord reply.
+
+    @param name str The record name to add.
+    @param zone dict The zone data to extract details from.
+    @param reply DNSRecord into which additional resource records are added.
+    """
+    def add_additional(self, name, zone, reply):
+        if zone['type'] != 'static':
+            return
+
+        ttl = DEFAULT_TTL
+        if "ttl" in zone:
+            ttl = int(zone['ttl'])
+
+        for rr in zone['rr']:
+            if rr['type'] in ('A', 'AAAA'):
+                rdata = self.construct_rdata(rr)
+                rtype = getattr(dnslib.QTYPE, rr['type'])
+                reply.add_ar(dnslib.RR(rname=name, rtype=rtype, ttl=ttl, rdata=rdata))
