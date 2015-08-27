@@ -12,7 +12,7 @@ try: import FlirbleDNSServer as fdns
 except: import __init__ as fdns
 
 """Default DNS record TTL, if one is not given in the zone definition."""
-DEFAULT_TTL = 30
+DEFAULT_TTL = 1800
 
 
 """A logging filter used when dumping the received and sent DNS packets; this
