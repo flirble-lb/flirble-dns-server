@@ -121,6 +121,10 @@ class Request(object):
         elif status is False:
             # Add an error status
             header.rcode = dnslib.RCODE.SERVFAIL
+        else:
+            # Look for authority data
+            name = qname[qname.index('.')+1:]
+            self.handle_zone(name, 'NS', reply, address, [], fn=reply.add_auth)
 
         if fdns.debug:
             log.debug("Reply to send:", extra={'zone': str(reply)})
@@ -139,11 +143,13 @@ class Request(object):
                 an IPv4-encoded-as-IPv6 address like "::ffff:a.b.c.d".
     @param chain list A chain of qnames that have been queried already in
                 this recursion tree.
+    @param fn function_pointer Override the function passed to methods to
+                add records to the reply.
     @return bool Returns True on success and False if we were unable to find
                 a winning set of servers and no static fallback was
                 available.
     """
-    def handle_zone(self, qname, qtype, reply, address, chain):
+    def handle_zone(self, qname, qtype, reply, address, chain, fn=None):
         # handle recursion checking
         if qname in chain:
             return
@@ -151,10 +157,11 @@ class Request(object):
 
         # Assume that if this is the first query in the chain this should be
         # an authoritative answer. Otherwise it's an additional answer.
-        if len(chain) <= 1:
-            fn = reply.add_auth
-        else:
-            fn = reply.add_ar
+        if fn is None:
+            if len(chain) <= 1:
+                fn = reply.add_answer
+            else:
+                fn = reply.add_ar
 
         # Dispatch appropriately.
         if qname in self.zones:
