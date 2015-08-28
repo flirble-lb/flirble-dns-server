@@ -203,8 +203,8 @@ class Request(object):
                 # If we were asking for A/AAAA, and got something else, this
                 # will effectively query the A/AAAA of that thing.
                 # NS is included since we use that to fill in the additional
-                # section if we have authority records
-                if qtype in ('A', 'AAAA', 'NS'):
+                # section if we have authority records.
+                if qtype in ('A', 'AAAA', 'NS', 'ANY'):
                     self._check_additional(rdata, qtype, reply, address, chain)
 
         return True
