@@ -155,13 +155,9 @@ class Request(object):
             return
         chain.append(qname)
 
-        # Assume that if this is the first query in the chain this should be
-        # an authoritative answer. Otherwise it's an additional answer.
+        # Assume that if otherwise unspecified, we add answers
         if fn is None:
-            if len(chain) <= 1:
-                fn = reply.add_answer
-            else:
-                fn = reply.add_ar
+            fn = reply.add_answer
 
         # Dispatch appropriately.
         if qname in self.zones:
@@ -363,5 +359,8 @@ class Request(object):
             # Get the label
             name = str(rdata.label)
             if name in self.zones:
-                self.handle_zone(name, ('A', 'AAAA'), reply, address, chain)
+                # If we're adding the A/AAAA for an NS record, those are
+                # additional. Otherwise we're adding normal answers.
+                fn = reply.add_ar if rtype == 'NS' else None
+                self.handle_zone(name, ('A', 'AAAA'), reply, address, chain, fn)
 
