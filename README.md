@@ -1,6 +1,6 @@
-= Flirble DNS Server
+# Flirble DNS Server
 
-== Ubuntu depdendencies
+## Ubuntu depdendencies
 
 ```
 sudo apt-get install -y build-essential git autoconf automake libtool \
@@ -13,7 +13,7 @@ sudo pip install dnslib
 If the Ubuntu `python-lockfile` package is too old, you may also need to
 `sudo pip install lockfile` to make the pidlockfile method available.
 
-== Setup GeoIP2 database
+## Setup GeoIP2 database
 
 ```
 cd
@@ -42,16 +42,16 @@ EOT
 sudo mkdir -p /usr/local/share/GeoIP
 
 sudo addgroup --system geoip
-sudo adduser --system --no-create-home --gecos GeoIP --home /usr/local/share/GeoIP --group geoip geoip
+sudo adduser --system --no-create-home --gecos GeoIP --home /usr/local/share/GeoIP --group geoip
 
 sudo chown geoip:geoip /usr/local/share/GeoIP
 
-echo "13 1 * * 3 geoip /usr/local/bin/geoipupdate" > /etc/cron.d/geoipupdate
+echo "13 1 * * 3 geoip /usr/local/bin/geoipupdate" | sudo tee /etc/cron.d/geoipupdate
 
 sudo -u geoip /usr/local/bin/geoipupdate
 ```
 
-== Install the Python bindings for GeoIP2
+## Install the Python bindings for GeoIP2
 
 ```
 git clone --recursive https://github.com/maxmind/libmaxminddb.git
