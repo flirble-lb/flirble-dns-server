@@ -191,12 +191,21 @@ class Request(object):
         if "ttl" in zone:
             ttl = int(zone['ttl'])
 
+        # if we're looking for A or AAAA specifically then also look for CNAME
+        q = (qtype, 'CNAME') if qtype in ('A', 'AAAA') else qtype
+
         for rr in zone['rr']:
-            if self._check_qtype(qtype, ('*', 'ANY', rr['type'])):
+            if self._check_qtype(q, ('*', 'ANY', rr['type'])):
                 rdata = self._construct_rdata(rr)
                 rtype = getattr(dnslib.QTYPE, rr['type'])
                 fn(dnslib.RR(rname=qname, rtype=rtype, ttl=ttl, rdata=rdata))
-                self._check_additional(rdata, reply, address, chain)
+
+                # If we were asking for A/AAAA, and got something else, this
+                # will effectively query the A/AAAA of that thing.
+                # NS is included since we use that to fill in the additional
+                # section if we have authority records
+                if qtype in ('A', 'AAAA', 'NS'):
+                    self._check_additional(rdata, qtype, reply, address, chain)
 
         return True
 
@@ -346,6 +355,9 @@ class Request(object):
     This currently applies to 'MX', 'CNAME' and 'NS' records.
 
     @param rdata RD An rdata object of the resource record to check.
+    @param qtype str|tuple The original query type from the client, or None
+                if unavailable. Broadly this is to limit recursion to only
+                the same type as requested if it was A or AAAA.
     @param reply DNSRecord The DNS reply to which we add our records.
     @params address str The IP address from which the datagram originated.
                 This can be either an IPv4 or an IPv6 address. It can also be
@@ -353,14 +365,23 @@ class Request(object):
     @param chain list A chain of qnames that have been queried already in
                 this recursion tree.
     """
-    def _check_additional(self, rdata, reply, address, chain):
+    def _check_additional(self, rdata, qtype, reply, address, chain):
         rtype = rdata.__class__.__name__
         if rtype in ('MX', 'CNAME', 'NS'):
             # Get the label
             name = str(rdata.label)
             if name in self.zones:
+                fn = None
                 # If we're adding the A/AAAA for an NS record, those are
                 # additional. Otherwise we're adding normal answers.
-                fn = reply.add_ar if rtype == 'NS' else None
-                self.handle_zone(name, ('A', 'AAAA'), reply, address, chain, fn)
+                # Also, for NS queries, we override what the search is for.
+                if rtype == 'NS':
+                    fn = reply.add_ar
+                    qtype = None
 
+                # If no qtype given (or NS overrides it) then do A,AAAA lookups
+                if qtype is None:
+                    qtype = ('A', 'AAAA')
+
+                # Use handle_zone to work out if we have the local records
+                self.handle_zone(name, qtype, reply, address, chain, fn)
