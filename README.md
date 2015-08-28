@@ -1,5 +1,23 @@
 # Flirble DNS Server
 
+This project provides a simple authoritative DNS server with a dynamic
+backend. Whilst it can also serve some static content its primary role is to
+respond to queries with records that reflect the result of an algorithm.
+
+In the initial version the program offers a simple distance comparison between
+a requesting DNS client and a set of target servers. The location of the
+client is discovered using the Maxmind GeoIP database; the location of the
+servers is provided in the server definition.
+
+Future versions will be even more dynamic by allowing servers to register
+themselves and continuously provide their health state.
+
+This system is not meant to be a replacement for a more robust commercial
+solution, such as from a content delivery network.
+
+
+# Installation
+
 ## Ubuntu 14.02 depdendencies
 
 ```
@@ -96,3 +114,10 @@ echo "13 1 * * 3 geoip /usr/bin/geoipupdate" | sudo tee /etc/cron.d/geoipupdate
 
 sudo -u geoip /usr/bin/geoipupdate
 ```
+
+# Setup
+
+## zones.json
+
+## servers.json
+
