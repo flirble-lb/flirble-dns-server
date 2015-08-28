@@ -110,7 +110,7 @@ class Request(object):
         qname = str(request.q.qname)
         qtype = dnslib.QTYPE[request.q.qtype]
 
-        header = dnslib.DNSHeader(id=request.header.id, qr=1, aa=1, ra=1)
+        header = dnslib.DNSHeader(id=request.header.id, qr=1, aa=1, ra=0)
         reply = dnslib.DNSRecord(header, q=request.q)
 
         status = self.handle_zone(qname, qtype, reply, address, [])
