@@ -312,6 +312,10 @@ class Request(object):
     """
     Helper method to check whether a requested qtype is in a list of those
     we answer to.
+
+    @param qtype str|list List of query types to check for.
+    @param dtype list List of query types to check against will accept.
+    @return bool True if one of qtype is in dtype, False otherwise.
     """
     def _check_qtype(self, qtype, dtype):
         if isinstance(qtype, str):
