@@ -55,6 +55,10 @@ class Request(object):
     zones = None
     servers = None
 
+    """A record of records added to a reply. A list of hash values."""
+    added = None
+
+
     """
     @param zones str The name of the zones configuration file. This must exist
                 at instance creation and be a valid JSON file.
@@ -88,6 +92,8 @@ class Request(object):
 
         if geo is not None:
             self.geo = geo
+
+        self.added = []
 
 
     """
@@ -123,11 +129,15 @@ class Request(object):
             header.rcode = dnslib.RCODE.SERVFAIL
         else:
             # Look for authority data
+            self.handle_zone(qname, 'NS', reply, address, [], fn=reply.add_auth)
             name = qname[qname.index('.')+1:]
             self.handle_zone(name, 'NS', reply, address, [], fn=reply.add_auth)
 
         if fdns.debug:
             log.debug("Reply to send:", extra={'zone': str(reply)})
+
+        # reset the seen-cache
+        self.added = []
 
         return reply.pack()
 
@@ -198,7 +208,7 @@ class Request(object):
             if self._check_qtype(q, ('*', 'ANY', rr['type'])):
                 rdata = self._construct_rdata(rr)
                 rtype = getattr(dnslib.QTYPE, rr['type'])
-                fn(dnslib.RR(rname=qname, rtype=rtype, ttl=ttl, rdata=rdata))
+                self._add(fn, dnslib.RR(rname=qname, rtype=rtype, ttl=ttl, rdata=rdata))
 
                 # If we were asking for A/AAAA, and got something else, this
                 # will effectively query the A/AAAA of that thing.
@@ -280,14 +290,14 @@ class Request(object):
                         if not isinstance(addrs, (list, tuple)):
                             addrs = [addrs]
                         for addr in addrs:
-                            fn(dnslib.RR(rname=qname, rtype=dnslib.QTYPE.A, ttl=ttl, rdata=dnslib.A(addr)))
+                            self._add(fn, dnslib.RR(rname=qname, rtype=dnslib.QTYPE.A, ttl=ttl, rdata=dnslib.A(addr)))
 
                     if 'ipv6' in server and self._check_qtype(qtype, ('*', 'ANY', 'AAAA')):
                         addrs = server['ipv6']
                         if not isinstance(addrs, (list, tuple)):
                             addrs = [addrs]
                         for addr in addrs:
-                            fn(dnslib.RR(rname=qname, rtype=dnslib.QTYPE.AAAA, ttl=ttl, rdata=dnslib.AAAA(addr)))
+                            self._add(fn, dnslib.RR(rname=qname, rtype=dnslib.QTYPE.AAAA, ttl=ttl, rdata=dnslib.AAAA(addr)))
 
                 return True
 
@@ -328,7 +338,7 @@ class Request(object):
 
     Any other RR type will elicit a return value of None.
 
-    @param rr hash The input zone information for a single resource record.
+    @param rr dict The input zone information for a single resource record.
     @returns RD Returns a subclassed RD (rdata) of the appropriate
                 type or None if the type provided in rr is not supported.
     """
@@ -385,3 +395,26 @@ class Request(object):
 
                 # Use handle_zone to work out if we have the local records
                 self.handle_zone(name, qtype, reply, address, chain, fn)
+
+
+    """
+    Helper function to add records to the reply but without allowing
+    duplicates.
+
+    It stores a simple hash of the record in a list and checks for that hash
+    before calling the given function to add new entries to the reply.
+    Specifically, the hash() function is called on the string representation
+    of rr.rdata.
+
+    @param fn function_pointer The function to call to add the record to the
+                reply.
+    @param rr DNSRecord The DNS record to attempt to add to the reply.
+    @return object Returns None if the entry is a duplicate, otherwise returns
+                with whatever fn() returned.
+    """
+    def _add(self, fn, rr):
+        h = hash(str(rr.rdata))
+        if h in self.added:
+            return None
+        self.added.append(h)
+        return fn(rr)
