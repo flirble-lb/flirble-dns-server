@@ -108,32 +108,34 @@ class Request(object):
         if fdns.debug:
             log.debug("Request received:", extra={'zone': str(request)})
 
-        qname = str(request.q.qname)
-        qtype = dnslib.QTYPE[request.q.qtype]
+        # Create a state-tracking object for this request.
+        state = RequestState()
 
-        header = dnslib.DNSHeader(id=request.header.id, qr=1, aa=1, ra=0)
-        reply = dnslib.DNSRecord(header, q=request.q)
+        state.address = address
+        state.qname = str(request.q.qname)
+        state.qtype = dnslib.QTYPE[request.q.qtype]
 
-        added = []
+        state.header = dnslib.DNSHeader(id=request.header.id, qr=1, aa=1, ra=0)
+        state.reply = dnslib.DNSRecord(state.header, q=request.q)
 
-        status = self.handle_zone(qname, qtype, reply, address, [], added)
+        status = self.handle_zone(state.qname, state.qtype, state)
 
         if status is None:
             # Add the denied message
-            header.rcode = dnslib.RCODE.REFUSED
+            state.header.rcode = dnslib.RCODE.REFUSED
         elif status is False:
             # Add an error status
-            header.rcode = dnslib.RCODE.SERVFAIL
+            state.header.rcode = dnslib.RCODE.SERVFAIL
         else:
             # Look for authority data
-            self.handle_zone(qname, 'NS', reply, address, [], added, fn=reply.add_auth)
-            name = qname[qname.index('.')+1:]
-            self.handle_zone(name, 'NS', reply, address, [], added, fn=reply.add_auth)
+            self.handle_zone(state.qname, 'NS', state, fn=state.reply.add_auth)
+            name = state.qname[state.qname.index('.')+1:]
+            self.handle_zone(name, 'NS', state, fn=state.reply.add_auth)
 
         if fdns.debug:
-            log.debug("Reply to send:", extra={'zone': str(reply)})
+            log.debug("Reply to send:", extra={'zone': str(state.reply)})
 
-        return reply.pack()
+        return state.reply.pack()
 
 
     """
@@ -141,36 +143,31 @@ class Request(object):
 
     @param qname str The record name.
     @param qtype str|tuple The record type(s) being asked for.
-    @param reply DNSRecord The DNS reply to which we add our records.
-    @params address str The IP address from which the datagram originated.
-                This can be either an IPv4 or an IPv6 address. It can also be
-                an IPv4-encoded-as-IPv6 address like "::ffff:a.b.c.d".
-    @param chain list A chain of qnames that have been queried already in
-                this recursion tree.
+    @param state RequestState The state tracking object for this request.
     @param fn function_pointer Override the function passed to methods to
                 add records to the reply.
     @return bool Returns True on success and False if we were unable to find
                 a winning set of servers and no static fallback was
                 available.
     """
-    def handle_zone(self, qname, qtype, reply, address, chain, added, fn=None):
+    def handle_zone(self, qname, qtype, state, fn=None):
         # handle recursion checking
-        if qname in chain:
+        if (qname, qtype) in state.chain:
             return
-        chain.append(qname)
+        state.chain.append(qname)
 
         # Assume that if otherwise unspecified, we add answers
         if fn is None:
-            fn = reply.add_answer
+            fn = state.reply.add_answer
 
         # Dispatch appropriately.
         if qname in self.zones:
             zone = self.zones[qname]
             if zone['type'] == 'static':
-                return self.handle_static(qname, qtype, zone, reply, address, chain, added, fn)
+                return self.handle_static(qname, qtype, zone, state, fn)
 
             if zone['type'] == 'geo-dist':
-                return self.handle_geo_dist(qname, qtype, zone, reply, address, chain, added, fn)
+                return self.handle_geo_dist(qname, qtype, zone, state, fn)
 
 
     """
@@ -182,15 +179,10 @@ class Request(object):
 
     @param qname str The record name.
     @param qtype str|tuple The record type(s) being asked for.
-    @param reply DNSRecord The DNS reply to which we add our records.
-    @params address str The IP address from which the datagram originated.
-                This can be either an IPv4 or an IPv6 address. It can also be
-                an IPv4-encoded-as-IPv6 address like "::ffff:a.b.c.d".
-    @param chain list A chain of qnames that have been queried already in
-                this recursion tree.
+    @param state RequestState The state tracking object for this request.
     @return bool This function always returns True.
     """
-    def handle_static(self, qname, qtype, zone, reply, address, chain, added, fn):
+    def handle_static(self, qname, qtype, zone, state, fn):
         ttl = DEFAULT_TTL
         if "ttl" in zone:
             ttl = int(zone['ttl'])
@@ -202,14 +194,14 @@ class Request(object):
             if self._check_qtype(q, ('*', 'ANY', rr['type'])):
                 rdata = self._construct_rdata(rr)
                 rtype = getattr(dnslib.QTYPE, rr['type'])
-                self._add(added, fn, dnslib.RR(rname=qname, rtype=rtype, ttl=ttl, rdata=rdata))
+                self._add(state, fn, dnslib.RR(rname=qname, rtype=rtype, ttl=ttl, rdata=rdata))
 
                 # If we were asking for A/AAAA, and got something else, this
                 # will effectively query the A/AAAA of that thing.
                 # NS is included since we use that to fill in the additional
                 # section if we have authority records.
                 if qtype in ('A', 'AAAA', 'NS', 'ANY'):
-                    self._check_additional(rdata, qtype, reply, address, chain, added)
+                    self._check_additional(rdata, qtype, state)
 
         return True
 
@@ -234,17 +226,12 @@ class Request(object):
 
     @param qname str The record name.
     @param qtype str|tuple The record type(s) being asked for.
-    @param reply DNSRecord The DNS reply to which we add our records.
-    @params address str The IP address from which the datagram originated.
-                This can be either an IPv4 or an IPv6 address. It can also be
-                an IPv4-encoded-as-IPv6 address like "::ffff:a.b.c.d".
-    @param chain list A chain of qnames that have been queried already in
-                this recursion tree.
+    @param state RequestState The state tracking object for this request.
     @return bool Returns True on success and False if we were unable to find
                 a winning set of servers and no static fallback was
                 available.
     """
-    def handle_geo_dist(self, qname, qtype, zone, reply, address, chain, added, fn):
+    def handle_geo_dist(self, qname, qtype, zone, state, fn):
         ttl = DEFAULT_TTL
         if "ttl" in zone:
             ttl = int(zone['ttl'])
@@ -261,7 +248,7 @@ class Request(object):
 
         if self.geo is not None and servers is not None:
             # check if we were given an ipv6-encoded-as-ipv6 address
-            client = address[0]
+            client = state.address[0]
             if client.startswith('::ffff:'):
                 # strip the ipv6 part
                 client = client[7:]
@@ -284,20 +271,20 @@ class Request(object):
                         if not isinstance(addrs, (list, tuple)):
                             addrs = [addrs]
                         for addr in addrs:
-                            self._add(added, fn, dnslib.RR(rname=qname, rtype=dnslib.QTYPE.A, ttl=ttl, rdata=dnslib.A(addr)))
+                            self._add(state, fn, dnslib.RR(rname=qname, rtype=dnslib.QTYPE.A, ttl=ttl, rdata=dnslib.A(addr)))
 
                     if 'ipv6' in server and self._check_qtype(qtype, ('*', 'ANY', 'AAAA')):
                         addrs = server['ipv6']
                         if not isinstance(addrs, (list, tuple)):
                             addrs = [addrs]
                         for addr in addrs:
-                            self._add(added, fn, dnslib.RR(rname=qname, rtype=dnslib.QTYPE.AAAA, ttl=ttl, rdata=dnslib.AAAA(addr)))
+                            self._add(state, fn, dnslib.RR(rname=qname, rtype=dnslib.QTYPE.AAAA, ttl=ttl, rdata=dnslib.AAAA(addr)))
 
                 return True
 
         # Fallthrough if geo stuff doesn't work...
         if 'rr' in zone:
-            return self.handle_static(qname, qtype, zone, reply, address, chain, added, fn)
+            return self.handle_static(qname, qtype, zone, state, fn)
 
         # Fallthrough on failure...
         return False
@@ -367,14 +354,9 @@ class Request(object):
     @param qtype str|tuple The original query type from the client, or None
                 if unavailable. Broadly this is to limit recursion to only
                 the same type as requested if it was A or AAAA.
-    @param reply DNSRecord The DNS reply to which we add our records.
-    @params address str The IP address from which the datagram originated.
-                This can be either an IPv4 or an IPv6 address. It can also be
-                an IPv4-encoded-as-IPv6 address like "::ffff:a.b.c.d".
-    @param chain list A chain of qnames that have been queried already in
-                this recursion tree.
+    @param state RequestState The state tracking object for this request.
     """
-    def _check_additional(self, rdata, qtype, reply, address, chain, added):
+    def _check_additional(self, rdata, qtype, state):
         rtype = rdata.__class__.__name__
         if rtype in ('MX', 'CNAME', 'NS'):
             # Get the label
@@ -385,7 +367,7 @@ class Request(object):
                 # additional. Otherwise we're adding normal answers.
                 # Also, for NS queries, we override what the search is for.
                 if rtype == 'NS':
-                    fn = reply.add_ar
+                    fn = state.reply.add_ar
                     qtype = None
 
                 # If no qtype given (or NS overrides it) then do A,AAAA lookups
@@ -393,7 +375,7 @@ class Request(object):
                     qtype = ('A', 'AAAA')
 
                 # Use handle_zone to work out if we have the local records
-                self.handle_zone(name, qtype, reply, address, chain, added, fn)
+                self.handle_zone(name, qtype, state, fn)
 
 
     """
@@ -405,15 +387,67 @@ class Request(object):
     Specifically, the hash() function is called on the string representation
     of rr.rdata.
 
+    @param state RequestState The state tracking object for this request.
     @param fn function_pointer The function to call to add the record to the
                 reply.
     @param rr DNSRecord The DNS record to attempt to add to the reply.
     @return object Returns None if the entry is a duplicate, otherwise returns
                 with whatever fn() returned.
     """
-    def _add(self, added, fn, rr):
+    def _add(self, state, fn, rr):
         h = hash(str(rr.rdata))
-        if h in added:
+        if h in state.added:
             return None
-        added.append(h)
+        state.added.append(h)
         return fn(rr)
+
+
+"""
+A class for storing the state associated with each request.
+"""
+class RequestState(object):
+    """
+    A chain of (qname, qtype) tuples that have been queried already in this
+    recursion tree.
+    """
+    chain = None
+
+    """
+    A tracker of the records added to a reply. A list of hash values
+    """
+    added = None
+
+    """
+    The IP address from which the datagram originated.
+    This can be either an IPv4 or an IPv6 address. It can also be
+    an IPv4-encoded-as-IPv6 address like "::ffff:a.b.c.d".
+    """
+    address = None
+
+    """
+    String representation of the original name being queried.
+    """
+    qname = None
+
+    """
+    String representation of the original query type (A, AAAA, ANY, etc)
+    """
+    qtype = None
+
+    """
+    The DNSHeader object of the reply being assembled.
+    """
+    header = None
+
+    """
+    The DNS reply to which records to respond with are added.
+    """
+    reply = None
+
+
+    def __init__(self):
+        super(RequestState, self).__init__()
+
+        self.chain = []
+        self.added = []
+
