@@ -5,7 +5,7 @@
 import os, logging
 log = logging.getLogger(os.path.basename(__file__))
 
-import sys, json
+import sys, json, threading
 import dnslib
 
 try: import FlirbleDNSServer as fdns
@@ -48,12 +48,16 @@ This supports two types of zone currently:
 """
 class Request(object):
 
+    zlock = None
+    slock = None
+
     zones_file = None
     servers_file = None
     geo = None
 
     zones = None
     servers = None
+
 
 
     """
@@ -64,31 +68,46 @@ class Request(object):
     @param geo Geo An instance of a Geo object that can be used to perform
                 geographic lookups and calculations.
     """
-    def __init__(self, zones=None, servers=None, geo=None):
+    def __init__(self, zones, servers, geo=None):
         super(Request, self).__init__()
 
-        if zones is not None:
-            if not os.path.exists(zones):
-                log.error("Zones file '%s' does not exist." % zones)
-                raise Exception("Zones file '%s' does not exist." % zones)
+        self.zlock = threading.Lock()
+        self.slock = threading.Lock()
 
-            self.zones_file = zones
+        if not os.path.exists(zones):
+            log.error("Zones file '%s' does not exist." % zones)
+            raise Exception("Zones file '%s' does not exist." % zones)
 
-            with open(zones, 'r') as f:
-                self.zones = json.load(f)
+        self.zones_file = zones
+        self._load_zones()
 
-        if servers is not None:
-            if not os.path.exists(servers):
-                log.error("Servers file '%s' does not exist." % servers)
-                raise Exception("Servers file '%s' does not exist." % servers)
+        if not os.path.exists(servers):
+            log.error("Servers file '%s' does not exist." % servers)
+            raise Exception("Servers file '%s' does not exist." % servers)
 
-            self.servers_file = servers
-
-            with open(servers, 'r') as f:
-                self.servers = json.load(f)
+        self.servers_file = servers
+        self._load_servers()
 
         if geo is not None:
             self.geo = geo
+
+
+    """
+    Loads the configured zones file.
+    """
+    def _load_zones(self):
+        with self.zlock:
+            with open(self.zones_file, 'r') as f:
+                self.zones = json.load(f)
+
+
+    """
+    Load the configured servers file.
+    """
+    def _load_servers(self):
+        with self.slock:
+            with open(self.servers_file, 'r') as f:
+                self.servers = json.load(f)
 
 
     """
@@ -160,9 +179,15 @@ class Request(object):
         if fn is None:
             fn = state.reply.add_answer
 
+        # Do we awnser for such a zone?
+        with self.zlock:
+            if qname in self.zones:
+                zone = self.zones[qname]
+            else:
+                zone = None
+
         # Dispatch appropriately.
-        if qname in self.zones:
-            zone = self.zones[qname]
+        if zone is not None:
             if zone['type'] == 'static':
                 return self.handle_static(qname, qtype, zone, state, fn)
 
@@ -238,13 +263,14 @@ class Request(object):
 
         servers = None
 
-        if 'servers' in zone:
-            s = zone['servers']
-            if s in self.servers:
-                servers = self.servers[s]
+        with self.slock:
+            if 'servers' in zone:
+                s = zone['servers']
+                if s in self.servers:
+                    servers = self.servers[s]
 
-        if servers is None and 'default' in self.servers:
-            servers = self.servers['default']
+            if servers is None and 'default' in self.servers:
+                servers = self.servers['default']
 
         if self.geo is not None and servers is not None:
             # check if we were given an ipv6-encoded-as-ipv6 address
