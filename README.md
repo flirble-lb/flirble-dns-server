@@ -78,7 +78,7 @@ This assumes availability of a directory of backported (from Vivid)
 or otherwise built-for-trusty packages for GeoIP, ZeroMQ and dnslib.
 
 ```
-sudo apt-get install -y git python-daemon python-ipaddr
+sudo apt-get install -y git python-daemon python-ipaddr libpgm-5.1-0
 sudo dpkg -i \
 	libmaxminddb0_1.0.4-2_amd64.deb \
 	libsodium13_1.0.3-1_amd64.deb \
