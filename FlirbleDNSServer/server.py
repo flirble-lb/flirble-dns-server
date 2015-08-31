@@ -63,6 +63,8 @@ class Server(object):
         log.debug("Initializing TCP server for '%s' port %d." % (address, port))
         self.servers.append(fdns.TCPServer((address, port), fdns.TCPRequestHandler, request))
 
+        self.request = request
+        self.geo = geo
 
     """
     Starts the threads and runs the servers. Returns once all services have
@@ -80,9 +82,10 @@ class Server(object):
         log.debug("DNS server started.")
 
         try:
-            while 1:
+            while True:
                 # This is the idle loop.
-                time.sleep(1)
+                time.sleep(30)
+                self.request.idle()
 
         except KeyboardInterrupt:
             pass
@@ -90,6 +93,10 @@ class Server(object):
             log.debug("Shutting down DNS server.")
             for s in self.servers:
                 s.shutdown()
+
+        self.request = None
+        self.geo = None
+        self.servers = None
 
 
 if __name__ == '__main__':

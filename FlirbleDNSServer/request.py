@@ -5,7 +5,7 @@
 import os, logging
 log = logging.getLogger(os.path.basename(__file__))
 
-import sys, json, threading, collections
+import sys, json, threading, collections, time
 import dnslib
 
 try: import FlirbleDNSServer as fdns
@@ -14,6 +14,8 @@ except: import __init__ as fdns
 """Default DNS record TTL, if one is not given in the zone definition."""
 DEFAULT_TTL = 1800
 
+"""Time to cache Geo results for."""
+GEO_CACHE_TTL = 5
 
 """A logging filter used when dumping the received and sent DNS packets; this
    filter handes the multiline output of dnslib when serializing such data."""
@@ -50,14 +52,17 @@ class Request(object):
 
     zlock = None
     slock = None
+    """A lock around self.geo_cache."""
+    glock = None
 
     zones_file = None
     servers_file = None
     geo = None
+    """A cache of servers returned by geo lookups for a client."""
+    geo_cache = None
 
     zones = None
     servers = None
-
 
 
     """
@@ -90,6 +95,8 @@ class Request(object):
 
         if geo is not None:
             self.geo = geo
+            self.geo_cache = {}
+            self.glock = threading.Lock()
 
 
     """
@@ -301,17 +308,23 @@ class Request(object):
         if "ttl" in zone:
             ttl = int(zone['ttl'])
 
-        servers = None
+        geo_cache_ttl = GEO_CACHE_TTL
+        if 'geo_cache_ttl' in zone:
+            geo_cache_ttl = int(zone['geo_cache_ttl'])
 
+        # Determine the set of servers to look at
+        servers = None
         with self.slock:
             if 'servers' in zone:
-                s = zone['servers']
-                if s in self.servers:
-                    servers = self.servers[s]
+                servers_set = zone['servers']
+                if servers_set in self.servers:
+                    servers = self.servers[servers_set]
 
             if servers is None and 'default' in self.servers:
-                servers = self.servers['default']
+                servers_set = 'default'
+                servers = self.servers[servers_set]
 
+        # if we have servers to look at...
         if self.geo is not None and servers is not None:
             # check if we were given an ipv6-encoded-as-ipv6 address
             client = state.address[0]
@@ -325,14 +338,41 @@ class Request(object):
             else:
                 params = {}
 
-            # go find the closest set of servers to the client address
-            servers = self.geo.find_closest_server(servers, client, params)
+            selected = None
 
-            found = False
+            # do we have a cached entry?
+            # build a composite key that includes the selection parameters
+            spar = tuple(sorted((key,value) for (key,value) in params.items()))
+            skey = (client, servers_set, spar)
+            with self.glock:
+                if skey in self.geo_cache:
+                    s = self.geo_cache[skey]
+                    # check the entry age - only use if not expired
+                    if time.time() < s[0]:
+                        selected = s[1]
+                        if fdns.debug:
+                            log.debug('handle_geo_dist using cached result for %s' % repr(skey))
+
+            if selected is None:
+                # go find the closest set of servers to the client address
+                if fdns.debug:
+                    log.debug('handle_geo_dist using calculated result for %s' % repr(skey))
+
+                selected = self.geo.find_closest_server(servers, client, params)
+
+                with self.glock:
+                    self.geo_cache[skey] = (
+                        time.time() + geo_cache_ttl,
+                        selected
+                    )
+
+            del(skey, spar, servers)
+
 
             # Only process the response if it's a list and it has entries
-            if isinstance(servers, list) and len(servers) > 0:
-                for server in servers:
+            found = False
+            if isinstance(selected, list) and len(selected) > 0:
+                for server in selected:
                     # Construct A and AAAA replies for this server
                     if 'ipv4' in server and self._check_qtype(qtype, ('ANY', 'A')):
                         addrs = server['ipv4']
@@ -358,6 +398,21 @@ class Request(object):
 
         # Fallthrough on failure...
         return False
+
+
+    """
+    Called periodically to take care of various housekeeping.
+    """
+    def idle(self):
+        # Remove any aged cached geo lookups
+        with self.glock:
+            zap = []
+            for k in self.geo_cache:
+                if self.geo_cache[k][0] < time.time():
+                    zap.append(k)
+            for k in zap:
+                del(self.geo_cache[k])
+
 
 
     """
