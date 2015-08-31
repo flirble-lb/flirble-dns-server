@@ -248,7 +248,7 @@ class Request(object):
         found = False
 
         for rr in zone['rr']:
-            if self._check_qtype(q, ('*', 'ANY', rr['type'])):
+            if self._check_qtype(q, ('ANY', rr['type'])):
                 found = True
                 rdata = self._construct_rdata(rr)
                 rtype = getattr(dnslib.QTYPE, rr['type'])
@@ -334,7 +334,7 @@ class Request(object):
             if isinstance(servers, list) and len(servers) > 0:
                 for server in servers:
                     # Construct A and AAAA replies for this server
-                    if 'ipv4' in server and self._check_qtype(qtype, ('*', 'ANY', 'A')):
+                    if 'ipv4' in server and self._check_qtype(qtype, ('ANY', 'A')):
                         addrs = server['ipv4']
                         if not isinstance(addrs, (list, tuple)):
                             addrs = [addrs]
@@ -342,7 +342,7 @@ class Request(object):
                             found = True
                             self._add(state, fn, dnslib.RR(rname=qname, rtype=dnslib.QTYPE.A, ttl=ttl, rdata=dnslib.A(addr)))
 
-                    if 'ipv6' in server and self._check_qtype(qtype, ('*', 'ANY', 'AAAA')):
+                    if 'ipv6' in server and self._check_qtype(qtype, ('ANY', 'AAAA')):
                         addrs = server['ipv6']
                         if not isinstance(addrs, (list, tuple)):
                             addrs = [addrs]
