@@ -390,6 +390,15 @@ class Request(object):
                             found = True
                             self._add(state, fn, dnslib.RR(rname=qname, rtype=dnslib.QTYPE.AAAA, ttl=ttl, rdata=dnslib.AAAA(addr)))
 
+                    if (fdns.debug or ('debug' in zone and zone['debug'] == True)) and self._check_qtype(qtype, ('ANY', 'TXT')):
+                        txt = []
+                        for item in ('name', 'city'):
+                            if item in server:
+                                txt.append('%s: %s' % (item, server[item]))
+
+                        for item in txt:
+                            self._add(state, fn, dnslib.RR(rname=qname, rtype=dnslib.QTYPE.TXT, ttl=ttl, rdata=dnslib.TXT(item)))
+
                 return found
 
         # Fallthrough if geo stuff doesn't work...
