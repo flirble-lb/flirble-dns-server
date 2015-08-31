@@ -5,7 +5,7 @@
 import os, logging
 log = logging.getLogger(os.path.basename(__file__))
 
-import sys, json, threading
+import sys, json, threading, collections
 import dnslib
 
 try: import FlirbleDNSServer as fdns
@@ -152,7 +152,7 @@ class Request(object):
                 q = 'NS'
 
             fn = state.reply.add_auth
-            parts = state.qname.split('.')
+            parts = collections.deque(state.qname.split('.'))
             status = False
             while status is False and len(parts) > 0:
                 name = '.'.join(parts)
@@ -160,10 +160,10 @@ class Request(object):
                     name = '.'
 
                 status = self.handle_zone(name, q, state, fn=fn)
-
                 if status is None:
                     status = False
-                parts.pop(0)
+
+                parts.popleft()
 
             if status is False:
                 state.header.rcode = dnslib.RCODE.REFUSED
