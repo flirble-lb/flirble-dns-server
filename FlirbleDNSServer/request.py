@@ -142,14 +142,31 @@ class Request(object):
         if status is None:
             # Add the denied message
             state.header.rcode = dnslib.RCODE.REFUSED
-        elif status is False:
-            # Add an error status
-            state.header.rcode = dnslib.RCODE.SERVFAIL
         else:
             # Look for authority data
-            self.handle_zone(state.qname, 'NS', state, fn=state.reply.add_auth)
-            name = state.qname[state.qname.index('.')+1:]
-            self.handle_zone(name, 'NS', state, fn=state.reply.add_auth)
+            if status == False:
+                # No error but no answer? Search for a parent zone SOA.
+                q = 'SOA'
+            else:
+                # If we had answers, look for additional useful data.
+                q = 'NS'
+
+            fn = state.reply.add_auth
+            parts = state.qname.split('.')
+            status = False
+            while status is False and len(parts) > 0:
+                name = '.'.join(parts)
+                if len(name) == 0:
+                    name = '.'
+
+                status = self.handle_zone(name, q, state, fn=fn)
+
+                if status is None:
+                    status = False
+                parts.pop(0)
+
+            if status is False:
+                state.header.rcode = dnslib.RCODE.REFUSED
 
         if fdns.debug:
             log.debug("Reply to send:", extra={'zone': str(state.reply)})
@@ -166,13 +183,17 @@ class Request(object):
     @param fn function_pointer Override the function passed to methods to
                 add records to the reply.
     @return bool Returns True on success and False if we were unable to find
-                a winning set of servers and no static fallback was
-                available.
+                matching reply records. None is returned on any error.
     """
     def handle_zone(self, qname, qtype, state, fn=None):
+        if fdns.debug:
+            log.debug("handle_zone qname=%s qtype=%s" % (qname, qtype))
+
         # handle recursion checking
         if (qname, qtype) in state.chain:
-            return
+            if fdns.debug:
+                log.debug("handle_zone qname,qtype in chain, ignoring. qname=%s qtype=%s" % (qname, qtype))
+            return None
         state.chain.append(qname)
 
         # Assume that if otherwise unspecified, we add answers
@@ -194,6 +215,11 @@ class Request(object):
             if zone['type'] == 'geo-dist':
                 return self.handle_geo_dist(qname, qtype, zone, state, fn)
 
+        if fdns.debug:
+            log.debug("handle_zone qname=%s qtype=%s not found" % (qname, qtype))
+
+        return False
+
 
     """
     Handles a request for a static DNS zone.
@@ -205,9 +231,13 @@ class Request(object):
     @param qname str The record name.
     @param qtype str|tuple The record type(s) being asked for.
     @param state RequestState The state tracking object for this request.
-    @return bool This function always returns True.
+    @return bool This function returns True if any records were added, False
+                otherwise.
     """
     def handle_static(self, qname, qtype, zone, state, fn):
+        if fdns.debug:
+            log.debug("handle_static qname=%s qtype=%s" % (qname, qtype))
+
         ttl = DEFAULT_TTL
         if "ttl" in zone:
             ttl = int(zone['ttl'])
@@ -215,8 +245,11 @@ class Request(object):
         # if we're looking for A or AAAA specifically then also look for CNAME
         q = (qtype, 'CNAME') if qtype in ('A', 'AAAA') else qtype
 
+        found = False
+
         for rr in zone['rr']:
             if self._check_qtype(q, ('*', 'ANY', rr['type'])):
+                found = True
                 rdata = self._construct_rdata(rr)
                 rtype = getattr(dnslib.QTYPE, rr['type'])
                 self._add(state, fn, dnslib.RR(rname=qname, rtype=rtype, ttl=ttl, rdata=rdata))
@@ -225,10 +258,10 @@ class Request(object):
                 # will effectively query the A/AAAA of that thing.
                 # NS is included since we use that to fill in the additional
                 # section if we have authority records.
-                if qtype in ('A', 'AAAA', 'NS', 'ANY'):
+                if self._check_qtype(qtype, ('A', 'AAAA', 'NS', 'ANY')):
                     self._check_additional(rdata, qtype, state)
 
-        return True
+        return found
 
 
     """
@@ -257,6 +290,13 @@ class Request(object):
                 available.
     """
     def handle_geo_dist(self, qname, qtype, zone, state, fn):
+        if fdns.debug:
+            log.debug("handle_geo_dist qname=%s qtype=%s" % (qname, qtype))
+
+        # Before doing anything, check the query is a type we can respond to
+        if not self._check_qtype(qtype, ('A', 'AAAA', 'ANY')):
+            return False
+
         ttl = DEFAULT_TTL
         if "ttl" in zone:
             ttl = int(zone['ttl'])
@@ -288,6 +328,8 @@ class Request(object):
             # go find the closest set of servers to the client address
             servers = self.geo.find_closest_server(servers, client, params)
 
+            found = False
+
             # Only process the response if it's a list and it has entries
             if isinstance(servers, list) and len(servers) > 0:
                 for server in servers:
@@ -297,6 +339,7 @@ class Request(object):
                         if not isinstance(addrs, (list, tuple)):
                             addrs = [addrs]
                         for addr in addrs:
+                            found = True
                             self._add(state, fn, dnslib.RR(rname=qname, rtype=dnslib.QTYPE.A, ttl=ttl, rdata=dnslib.A(addr)))
 
                     if 'ipv6' in server and self._check_qtype(qtype, ('*', 'ANY', 'AAAA')):
@@ -304,9 +347,10 @@ class Request(object):
                         if not isinstance(addrs, (list, tuple)):
                             addrs = [addrs]
                         for addr in addrs:
+                            found = True
                             self._add(state, fn, dnslib.RR(rname=qname, rtype=dnslib.QTYPE.AAAA, ttl=ttl, rdata=dnslib.AAAA(addr)))
 
-                return True
+                return found
 
         # Fallthrough if geo stuff doesn't work...
         if 'rr' in zone:
