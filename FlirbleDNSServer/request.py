@@ -79,13 +79,16 @@ class Request(object):
         self.zlock = threading.Lock()
         self.slock = threading.Lock()
 
-        self.rdb  = rdb
-
-        rdb.register_table(zones, self._zones_cb)
+        self.rdb = rdb
         self.zones_table = zones
+        self.servers_table = servers
 
-        rdb.register_table(servers, self._servers_cb)
-        self.serverd_table = servers
+        self.zones = {}
+        self.servers = {}
+
+        if rdb is not None:
+            rdb.register_table(zones, self._zones_cb)
+            rdb.register_table(servers, self._servers_cb)
 
         if geo is not None:
             self.geo = geo
@@ -96,17 +99,23 @@ class Request(object):
     """
     Callback for initial and updates to the distributed Zones database.
     """
-    def _zones_cb(self, change):
+    def _zones_cb(self, rdb, change):
         with self.zlock:
-            pass
+            log.debug("Zones change: %s" % repr(change))
+            new = change["new_val"]
+            for k in new:
+                self.zones[k] = new[k]
 
 
     """
     Callback for initial and updates to the distributed Servers database.
     """
-    def _servers_cb(self, change):
+    def _servers_cb(self, rdb, change):
         with self.slock:
-            pass
+            log.debug("Servers change: %s" % repr(change))
+            new = change["new_val"]
+            for k in new:
+                self.servers[k] = new[k]
 
 
     """

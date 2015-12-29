@@ -21,8 +21,8 @@ PORT = 8053
 
 GEODB = "/usr/local/share/GeoIP/GeoLite2-City.mmdb"
 
-RETHINKDB_HOST = None # "localhost:28015"
-RETHINKDB_NAME = "flirble-dns"
+RETHINKDB_HOST = "localhost:28015"
+RETHINKDB_NAME = "flirble_dns"
 ZONES = "zones"
 SERVERS = "servers"
 
@@ -97,15 +97,15 @@ if args.log_file is None and args.foreground is False:
 
 # Initialize and connect RethinkDB
 rdb = None
-if args.rethinkdb_host is not None and args.rethinkdb_host is not "":
-    log.info("Connecting to RethinkDB at '%s'" % args.rethinkdb)
+if args.rethinkdb_host is not None: # and args.rethinkdb_host != "":
+    log.info("Connecting to RethinkDB at '%s'" % args.rethinkdb_host)
 
     rdb = fdns.Data(remote=args.rethinkdb_host, name=args.rethinkdb_name)
     if rdb == False or rdb.start() == False:
         raise Exception("Cannot start DNS server: %s" % "Failed to connect to RethinkDB")
 
 # We should be good to go by here!
-log.info("Starting DNS server on '%s' port %d" % (args.address, args.port))
+log.info("Starting DNS server on '%s' port '%d'." % (args.address, args.port))
 
 # If we're not going to stay in the foreground, daemonize.
 if args.foreground is False:
@@ -139,8 +139,8 @@ try:
     server = fdns.Server(rdb, args.address, args.port, args.zones, args.servers, args.geodb)
     server.run()
 except Exception as e:
-    log.error("Exception when running the DNS server:\n%s." % e.strerror)
-    log.debug("Traceback:\n%s." % traceback.format_exc())
+    log.error("Exception when running the DNS server:\n%s." % e.message)
+    log.debug("%s." % traceback.format_exc())
 
 # All done!
 log.info("Exiting normally.")

@@ -64,6 +64,7 @@ class Server(object):
 
         self.request = request
         self.geo = geo
+        self.rdb = rdb
 
     """
     Starts the threads and runs the servers. Returns once all services have
@@ -92,15 +93,18 @@ class Server(object):
             log.debug("Shutting down DNS server.")
             for s in self.servers:
                 s.shutdown()
+            self.rdb.stop()
+
 
         self.request = None
         self.geo = None
         self.servers = None
+        self.rdb = None
 
 
 if __name__ == '__main__':
     log.info("Running test DNS server on port %d" % (PORT))
     fdns.debug = True
-    server = Server()
+    server = Server(rdb=None)
     server.run()
 
