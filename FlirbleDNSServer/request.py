@@ -55,8 +55,9 @@ class Request(object):
     """A lock around self.geo_cache."""
     glock = None
 
-    zones_file = None
-    servers_file = None
+    rdb = None
+    zones_table = None
+    servers_table = None
     geo = None
     """A cache of servers returned by geo lookups for a client."""
     geo_cache = None
@@ -66,32 +67,25 @@ class Request(object):
 
 
     """
-    @param zones str The name of the zones configuration file. This must exist
-                at instance creation and be a valid JSON file.
-    @param servers str The name of the servers configuration file. This mys
-                exist at instance creation and be a valid JSON file.
+    @param rdb FlirbleDNSServer.Data The database handle.
+    @param zones str The zones table to fetch zone data from.
+    @param servers str The servers table to fetch server data from.
     @param geo Geo An instance of a Geo object that can be used to perform
                 geographic lookups and calculations.
     """
-    def __init__(self, zones, servers, geo=None):
+    def __init__(self, rdb, zones, servers, geo=None):
         super(Request, self).__init__()
 
         self.zlock = threading.Lock()
         self.slock = threading.Lock()
 
-        if not os.path.exists(zones):
-            log.error("Zones file '%s' does not exist." % zones)
-            raise Exception("Zones file '%s' does not exist." % zones)
+        self.rdb  = rdb
 
-        self.zones_file = zones
-        self._load_zones()
+        rdb.register_table(zones, self._zones_cb)
+        self.zones_table = zones
 
-        if not os.path.exists(servers):
-            log.error("Servers file '%s' does not exist." % servers)
-            raise Exception("Servers file '%s' does not exist." % servers)
-
-        self.servers_file = servers
-        self._load_servers()
+        rdb.register_table(servers, self._servers_cb)
+        self.serverd_table = servers
 
         if geo is not None:
             self.geo = geo
@@ -100,21 +94,19 @@ class Request(object):
 
 
     """
-    Loads the configured zones file.
+    Callback for initial and updates to the distributed Zones database.
     """
-    def _load_zones(self):
+    def _zones_cb(self, change):
         with self.zlock:
-            with open(self.zones_file, 'r') as f:
-                self.zones = json.load(f)
+            pass
 
 
     """
-    Load the configured servers file.
+    Callback for initial and updates to the distributed Servers database.
     """
-    def _load_servers(self):
+    def _servers_cb(self, change):
         with self.slock:
-            with open(self.servers_file, 'r') as f:
-                self.servers = json.load(f)
+            pass
 
 
     """

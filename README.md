@@ -26,6 +26,7 @@ sudo apt-get install -y build-essential git autoconf automake libtool \
     python-daemon python-lockfile
 
 sudo pip install dnslib
+sudo pip install rethinkdb
 ```
 
 If the Ubuntu `python-lockfile` package is too old, you may also need to
@@ -92,6 +93,8 @@ sudo dpkg -i \
 	python-lockfile_0.10.2-2ubuntu1_all.deb \
 	python-zmq_14.4.1-0ubuntu5_amd64.deb
 ```
+
+TODO: find rethinkb
 
 ### Setup and fetch GeoIP data
 

@@ -39,23 +39,22 @@ class Server(object):
     Then creates TCP and UDP servers, which opens sockets and binds them
     to the given address and port.
 
+    @param rdb FlirbleDNSServer.Data The database object to use.
     @param address str The local address to bind to. Default is "::".
     @param port int The local port number to vind to. Default is "8053".
-    @param zones str The zones file that the Request handler should load.
-                Default is None.
-    @param server str The servers file that the Request handler should load.
-                Default is None.
+    @param zones str The zones table to fetch zone data from.
+    @param server str The servers table to fetch server data from.
     @param geodb str The Maxmind GeoIP database that the Geo class should
                 load. Default is None.
     """
-    def __init__(self, address=ADDRESS, port=PORT, zones=None, servers=None, geodb=None):
+    def __init__(self, rdb, address=ADDRESS, port=PORT, zones=None, servers=None, geodb=None):
         super(Server, self).__init__()
 
         log.debug("Initializing Geo module.")
         geo = fdns.Geo(geodb=geodb)
 
         log.debug("Initializing Request module.")
-        request = fdns.Request(zones=zones, servers=servers, geo=geo)
+        request = fdns.Request(rdb=rdb, zones=zones, servers=servers, geo=geo)
 
         self.servers = []
         log.debug("Initializing UDP server for '%s' port %d." % (address, port))

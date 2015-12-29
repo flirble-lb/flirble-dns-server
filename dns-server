@@ -4,7 +4,7 @@
 import os, logging
 log = logging.getLogger(os.path.basename(__file__))
 
-import argparse, sys, traceback
+import argparse, sys, socket, traceback
 import daemon, lockfile.pidlockfile
 import FlirbleDNSServer as fdns
 
@@ -14,33 +14,56 @@ DEBUG = fdns.debug
 LOGFILE = None
 LOGLEVEL = "info"
 PIDFILE = "/var/run/flirble-dns-server.pid"
+HOSTNAME = socket.gethostname()
+
 ADDRESS = '::'
 PORT = 8053
-ZONES = "zones.json"
-SERVERS = "servers.json"
+
 GEODB = "/usr/local/share/GeoIP/GeoLite2-City.mmdb"
 
-parser = argparse.ArgumentParser(description="Flirble DNS Server version %s." % fdns.version)
-parser.add_argument("-f", "--foreground", default=FOREGROUND, action="store_true", help="Don't daemonize, stay in the foreground. [%s]" % str(FOREGROUND))
-parser.add_argument("-d", "--debug", default=DEBUG, action="store_true", help="Print extra diagnostic data. Implies --foreground and --log-level=debug. [%s]" % str(DEBUG))
-parser.add_argument("--log-file", metavar="filename", default=LOGFILE, help="File to send logging output to. [%s]" % "stderr" if LOGFILE is None else LOGFILE)
-parser.add_argument("--log-level", default=LOGLEVEL, choices=["debug", "info", "warning", "error", "critical"], help="Logging level. [%s]" % LOGLEVEL.lower())
-parser.add_argument("--pid-file", metavar="filename", default=PIDFILE, help="File to store the PID value in when daemonized. [%s]" % PIDFILE)
-parser.add_argument("--address", metavar="ip-address", default=ADDRESS, help="IP address to bind to. The default binds to the wildcard for both IPv4 and IPv6. [%s]" % ADDRESS)
-parser.add_argument("--port", metavar="number", default=PORT, type=int, help="TCP and UDP port number to listen on. [%d]" % PORT)
-parser.add_argument("--zones", metavar="filename", default=ZONES, help="Zones JSON file. [%s]" % ZONES)
-parser.add_argument("--servers", metavar="filename", default=SERVERS, help="Servers JSON file. [%s]" % SERVERS)
-parser.add_argument("--geodb", metavar="filename", default=GEODB, help="GeoIP City database file to use. [%s]" % GEODB)
+RETHINKDB_HOST = None # "localhost:28015"
+RETHINKDB_NAME = "flirble-dns"
+ZONES = "zones"
+SERVERS = "servers"
 
+# Build the command line parser
+parser = argparse.ArgumentParser(description="Flirble DNS Server version %s." % fdns.version)
+main = parser.add_argument_group("Main options")
+main.add_argument("-f", "--foreground", default=FOREGROUND, action="store_true", help="Don't daemonize, stay in the foreground. [%s]" % str(FOREGROUND))
+main.add_argument("-d", "--debug", default=DEBUG, action="store_true", help="Print extra diagnostic data. Implies --foreground and --log-level=debug. [%s]" % str(DEBUG))
+main.add_argument("--log-file", metavar="filename", default=LOGFILE, help="File to send logging output to. [%s]" % "stderr" if LOGFILE is None else LOGFILE)
+main.add_argument("--log-level", default=LOGLEVEL, choices=["debug", "info", "warning", "error", "critical"], help="Logging level. [%s]" % LOGLEVEL.lower())
+main.add_argument("--pid-file", metavar="filename", default=PIDFILE, help="File to store the PID value in when daemonized. [%s]" % PIDFILE)
+main.add_argument("--hostname", metavar="string", default=HOSTNAME, help="The local host name. [%s]" % HOSTNAME)
+
+network = parser.add_argument_group("Network options")
+network.add_argument("--address", metavar="ip-address", default=ADDRESS, help="IP address to bind to. The default binds to the wildcard for both IPv4 and IPv6. [%s]" % ADDRESS)
+network.add_argument("--port", metavar="number", default=PORT, type=int, help="TCP and UDP port number to listen on. [%d]" % PORT)
+
+geoip = parser.add_argument_group("GeoIP options")
+geoip.add_argument("--geodb", metavar="filename", default=GEODB, help="GeoIP City database file to use. [%s]" % GEODB)
+
+db = parser.add_argument_group("RethinkDB options")
+db.add_argument("--rethinkdb-host", metavar="name[:port]", default=RETHINKDB_HOST, help="Connection details for RethinkDB server, eg 'localhost:28015'. [%s]" % "none" if RETHINKDB_HOST is None else RETHINKDB_HOST)
+db.add_argument("--rethinkdb-name", metavar="string", default=RETHINKDB_NAME, help="RethinkDB database name. [%s]" % RETHINKDB_NAME)
+db.add_argument("--zones", metavar="table", default=ZONES, help="Zones table name. [%s]" % ZONES)
+db.add_argument("--servers", metavar="table", default=SERVERS, help="Servers table name. [%s]" % SERVERS)
+
+
+
+# Run the command line parser
 args = parser.parse_args()
 
+# Handle debug mode
 fdns.debug = args.debug
 if fdns.debug:
     args.log_level = "debug"
     args.foreground = True
 
+# Setup logging
 logging.basicConfig(filename=args.log_file, level=getattr(logging, args.log_level.upper(), None))
 
+# If we're in a diagnostic mode then do some special stuff for logging
 if args.log_file is None and args.foreground is False:
     # Use a syslog handler for logging
     import platform, logging.handlers
@@ -72,9 +95,19 @@ if args.log_file is None and args.foreground is False:
     # add the syslog handler
     log.root.addHandler(h)
 
+# Initialize and connect RethinkDB
+rdb = None
+if args.rethinkdb_host is not None and args.rethinkdb_host is not "":
+    log.info("Connecting to RethinkDB at '%s'" % args.rethinkdb)
 
+    rdb = fdns.Data(remote=args.rethinkdb_host, name=args.rethinkdb_name)
+    if rdb == False or rdb.start() == False:
+        raise Exception("Cannot start DNS server: %s" % "Failed to connect to RethinkDB")
+
+# We should be good to go by here!
 log.info("Starting DNS server on '%s' port %d" % (args.address, args.port))
 
+# If we're not going to stay in the foreground, daemonize.
 if args.foreground is False:
     # discover file handles to preserve
     preserve_files = []
@@ -84,17 +117,30 @@ if args.foreground is False:
         if hasattr(h, 'socket'):
             preserve_files.append(h.socket)
 
+    # extract the socket from rethinkdb
+    # NB: uses private attributes :(
+    if rdb.r._instance is not None:
+        if hasattr(rdb.r._instance, '_socket'):
+            s = rdb.r._instance._socket
+            preserve_files.append(s)
+
     # create the daemon context
     ctx = daemon.DaemonContext()
     ctx.umask = 0o027
     ctx.pidfile = lockfile.pidlockfile.PIDLockFile(args.pid_file)
     ctx.preserve_files = preserve_files
 
+    # daemonize
     ctx.open()
 
+# And now do some real work
 try:
     # Fire it all up!
-    server = fdns.Server(args.address, args.port, args.zones, args.servers, args.geodb)
+    server = fdns.Server(rdb, args.address, args.port, args.zones, args.servers, args.geodb)
     server.run()
-except Exception:
-    log.error("Exception when running the DNS server:\n%s" % traceback.format_exc())
+except Exception as e:
+    log.error("Exception when running the DNS server:\n%s." % e.strerror)
+    log.debug("Traceback:\n%s." % traceback.format_exc())
+
+# All done!
+log.info("Exiting normally.")

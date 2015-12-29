@@ -8,7 +8,7 @@ A DNS server that does some sort of crude Gepgraphically-aware loadbalancing.
 """
 
 """Flirble DNS Server version number."""
-version = "0.1"
+version = "0.2"
 
 """Whether to emit extra diagnostic output."""
 debug = False
@@ -18,3 +18,4 @@ from handler import *
 from request import *
 from geo import *
 from geodistance import *
+from data import *
