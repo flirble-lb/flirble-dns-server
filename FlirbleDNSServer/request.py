@@ -5,7 +5,7 @@
 import os, logging
 log = logging.getLogger(os.path.basename(__file__))
 
-import sys, json, threading, collections, time
+import sys, json, threading, collections, time, copy
 import dnslib
 
 try: import FlirbleDNSServer as fdns
@@ -101,10 +101,11 @@ class Request(object):
     """
     def _zones_cb(self, rdb, change):
         with self.zlock:
-            log.debug("Zones change: %s" % repr(change))
+            if fdns.debug:
+                log.debug("Zone change: %s" % json.dumps(change, sort_keys=True,
+                                        indent=4, separators=(',', ': ')))
             new = change["new_val"]
-            for k in new:
-                self.zones[k] = new[k]
+            self.zones[new['name']] = new
 
 
     """
@@ -112,10 +113,26 @@ class Request(object):
     """
     def _servers_cb(self, rdb, change):
         with self.slock:
-            log.debug("Servers change: %s" % repr(change))
+            if fdns.debug:
+                log.debug("Server change: %s" % json.dumps(change, sort_keys=True,
+                                        indent=4, separators=(',', ': ')))
             new = change["new_val"]
-            for k in new:
-                self.servers[k] = new[k]
+
+            if ',' in new['name']:
+                (group, name) = new['name'].split(',')
+            elif '!' in new['name']:
+                (group, name) = new['name'].split('!')
+            else:
+                group = new['name']
+                name = new['name']
+
+            if fdns.debug:
+                log.debug("Updating group '%s' server '%s'." % (group, name))
+
+            if group not in self.servers:
+                self.servers[group] = {}
+
+            self.servers[group][name] = new
 
 
     """
@@ -315,15 +332,51 @@ class Request(object):
 
         # Determine the set of servers to look at
         servers = None
+        groups = None
         with self.slock:
-            if 'servers' in zone:
-                servers_set = zone['servers']
-                if servers_set in self.servers:
-                    servers = self.servers[servers_set]
+            servers = []
+            if 'groups' in zone:
+                # Parse the servers group list
+                groups = zone['groups']
 
-            if servers is None and 'default' in self.servers:
-                servers_set = 'default'
-                servers = self.servers[servers_set]
+                if fdns.debug:
+                    log.debug("Found 'groups' in zone: '%s'." % groups)
+
+                if "," in groups:
+                    groups = tuple(groups.split(","))
+                elif isinstance(groups, list) or isinstance(groups, tuple):
+                    groups = tuple(groups)
+                else:
+                    if fdns.paranoid:
+                        groups = (copy.copy(groups),)
+                    else:
+                        groups = (groups,)
+
+                # Collate the server data
+                for group in groups:
+                    if group in self.servers:
+                        # Build a list of the servers (extract the list from the dict)
+                        for name in self.servers[group]:
+                            server = self.servers[group][name]
+                            if fdns.paranoid:
+                                servers.append(copy.deepcopy(server))
+                            else:
+                                servers.append(server)
+
+            if len(servers) == 0:
+                if 'default' in self.servers:
+                    if fdns.debug:
+                        log.debug("No servers found; using default.")
+                    groups = ('default',)
+                    if fdns.paranoid:
+                        servers = copy.copy(self.servers['default'])
+                    else:
+                        servers = self.servers['default']
+                else:
+                    if fdns.debug:
+                        log.debug("No servers found; no default found; this may break!")
+                    servers_set = ('unknown',)
+
 
         # if we have servers to look at...
         if self.geo is not None and servers is not None:
@@ -344,7 +397,7 @@ class Request(object):
             # do we have a cached entry?
             # build a composite key that includes the selection parameters
             spar = tuple(sorted((key,value) for (key,value) in params.items()))
-            skey = (client, servers_set, spar)
+            skey = (client, groups, spar)
             with self.glock:
                 if skey in self.geo_cache:
                     s = self.geo_cache[skey]
@@ -367,7 +420,8 @@ class Request(object):
                         selected
                     )
 
-            del(skey, spar, servers)
+            # Don't need these anymore
+            del(skey, spar, servers, groups)
 
 
             # Only process the response if it's a list and it has entries

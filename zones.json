@@ -1,0 +1,75 @@
+[
+	{
+		"name": "l.flirble.org.",
+		"type": "static",
+		"ttl": 1800,
+		"rr": [
+			{
+				"type": "SOA",
+				"mname": "ns0.l.flirble.org.",
+				"rname": "hostmaster.flirble.org.",
+				"times": [ 2015010100, 3600, 10800, 86400, 3600 ]
+			},
+			{
+				"type": "NS",
+				"value": "ns0.l.flirble.org."
+			},
+			{
+				"type": "NS",
+				"value": "ns1.l.flirble.org."
+			},
+			{
+				"type": "TXT",
+				"value": "Flirble DNS Server"
+			}
+		]
+	},
+	{
+		"name": "ns0.l.flirble.org.",
+		"type": "static",
+		"rr": [
+			{
+				"type": "A",
+				"value": "192.168.10.10"
+			},
+			{
+				"type": "AAAA",
+				"value": "2001:dba:0:10::10:10"
+			}
+		]
+	},
+	{
+		"name": "ns1.l.flirble.org.",
+		"type": "static",
+		"rr": [
+			{
+				"type": "A",
+				"value": "192.168.11.11"
+			},
+			{
+				"type": "AAAA",
+				"value": "2001:dba:0:11::11:11"
+			}
+		]
+	},
+	{
+		"name": "g.l.flirble.org.",
+		"type": "geo-dist",
+		"groups": "flirble",
+		"ttl": 5,
+		"params": {
+			"maxreplies": 2,
+			"maxload": 10
+		},
+		"rr": [
+			{
+				"type": "A",
+				"value": "10.20.30.40"
+			},
+			{
+				"type": "AAAA",
+				"value": "2001:dba:10::10:20:30:40"
+			}
+		]
+	}
+]

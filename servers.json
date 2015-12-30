@@ -1,0 +1,47 @@
+[
+    {
+        "name": "default",
+        "city": "none",
+        "lat": 0,
+        "lon": 0,
+        "ipv4": "10.0.0.1",
+        "ipv6": "2001:db8::1",
+        "load": 0.0
+    },
+    {
+        "name": "flirble!castaway",
+        "city": "nyc",
+        "lat": 40.7127,
+        "lon": -74.0059,
+        "ipv4": "207.162.195.200",
+        "ipv6": "2001:6f8:0:102::1000:1",
+        "load": 0.0
+    },
+    {
+        "name": "flirble!dank",
+        "city": "nyc",
+        "lat": 40.7127,
+        "lon": -74.0059,
+        "ipv4": "199.38.181.14",
+        "ipv6": "2607:f740:f::e89",
+        "load": 0.0
+    },
+    {
+        "name": "flirble!dewy",
+        "city": "lon",
+        "lat": 51.5072,
+        "lon": 0,
+        "ipv4": "176.58.88.164",
+        "ipv6": "2a00:dd80:3a::77b",
+        "load": 0.0
+    },
+    {
+        "name": "flirble!douh",
+        "city": "sjc",
+        "lat": 37.3382,
+        "lon": -121.8863,
+        "ipv4": "208.111.35.176",
+        "ipv6": "2607:f740:0:3f::57e",
+        "load": 0.0
+    }
+]

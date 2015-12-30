@@ -117,8 +117,10 @@ class Geo(object):
 
         for server in servers:
             # check server load, if applicable
+            # if it's not present in either the parameters or the server then
+            # this server remains a candidate
             if 'maxload' in params and 'load' in server:
-                if server['load'] > params['maxload']:
+                if float(server['load']) > float(params['maxload']):
                     # server load exceeds allowable maximum, don't
                     # consider it as a candidate
                     continue

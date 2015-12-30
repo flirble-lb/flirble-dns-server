@@ -49,8 +49,6 @@ db.add_argument("--rethinkdb-name", metavar="string", default=RETHINKDB_NAME, he
 db.add_argument("--zones", metavar="table", default=ZONES, help="Zones table name. [%s]" % ZONES)
 db.add_argument("--servers", metavar="table", default=SERVERS, help="Servers table name. [%s]" % SERVERS)
 
-
-
 # Run the command line parser
 args = parser.parse_args()
 

@@ -13,6 +13,11 @@ version = "0.2"
 """Whether to emit extra diagnostic output."""
 debug = False
 
+"""Whether certain operations within a lock take a copy of an object or
+just a reference for use outside the lock. Might have performance versus
+robustness implications."""
+paranoid = True
+
 from server import *
 from handler import *
 from request import *
