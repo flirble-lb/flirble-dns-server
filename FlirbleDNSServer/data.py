@@ -11,13 +11,34 @@ import rethinkdb as r
 try: import FlirbleDNSServer as fdns
 except: import __init__ as fdns
 
+"""
+Manages the connection with a RethinkDB.
+
+There is at least one connection to the DB, used to queries and updates.
+Further connections may be initiated and managed from their own threads
+to monitor tables for changes; any such changes are delivered to callback
+functions.
+"""
 class Data(object):
     r = None
     rlock = None
     _table_threads = None
+    _tlock = None
     _running = None
 
-    def __init__(self, remote=None, name=None, auth=None, ssl=dict()):
+    """
+    Configure the database manager.
+
+    This does not start any connections, it only configures the object.
+
+    @param remote str The remote database to connect to in the format
+            "host:port". ':port' is optional and will the RethinkDB client
+            driver will default to '28015'.
+    @param name str The name of the database on the host to use.
+    @param auth str An authentication key. Defaults to an empty string.
+    @param ssl dict SSL options. See RethinkDB 'connect' for details.
+    """
+    def __init__(self, remote, name, auth=None, ssl=dict()):
         super(Data, self).__init__()
 
         if auth is None:
@@ -37,11 +58,17 @@ class Data(object):
         self._auth = auth
         self._ssl = ssl
 
-        self.rlock = threading.RLock()
+        self.rlock = threading.Lock()
+        self._tlock = threading.Lock()
 
         self.running = False
 
 
+    """
+    Start the primary database connection.
+
+    @returns bool True on success, False otherwise.
+    """
     def start(self):
         log.info("Connecting to RethinkDB at '%s:%s' db '%s'." % (self._host, self._port, self._name))
         try:
@@ -57,6 +84,19 @@ class Data(object):
     """
     Adds a thread monitoring a table for changes, calling the cb when
     a change is made.
+
+    The thread is a daemon thread so it will does not block the process
+    from exiting.
+
+    @param table str The name of the table to monitor.
+    @param cb function A function to call when changes arrive. This should
+        match the signature 'def _cb(self, rdb, change)' where 'rdb' is
+        a reference to this calling object and 'change' is a dictionary
+        containing the change. See RethinkDB documentation for the contents
+        of 'chamge'.
+    @returns bool True on success, False otherwise. Reasons to fail include
+        failing to connect to the database or trying to monitor a table
+        we're monitoring.
     """
     def register_table(self, table, cb):
         # create _monitor_thread
@@ -86,10 +126,11 @@ class Data(object):
             connection.close()
             return False
 
-        self._table_threads[table] = {
-            "thread": t,
-            "connection": connection
-        }
+        with self._tlock:
+            self._table_threads[table] = {
+                "thread": t,
+                "connection": connection
+            }
 
         t.daemon = True
         t.start()
@@ -98,13 +139,19 @@ class Data(object):
 
 
     """
-    Creates a new connection to the database and monitors a table for changes.
+    The thread target that monitors a table for changes.
+
+    @param table str The name of the table to monitor.
+    @param cb function The callback function that will be called.
+    @param connection rethinkdb.Connection The database connection to use
+        for the monitoring.
     """
     def _monitor_thread(self, table, cb, connection):
         log.info("Monitoring table '%s' for changes." % table)
         feed = r.table(table).changes(include_initial=True).run(connection)
 
-        # TODO need to find a way to make this interruptible when we're asked to stop running
+        # TODO need to find a way to make this interruptible for a cleaner
+        # exit when we're asked to stop running
         for change in feed:
             cb(self, change)
 
@@ -112,6 +159,9 @@ class Data(object):
                 break
 
         log.info("Closing RethinkDB connection for monitoring table '%s'." % table)
+
+        with self._tlock:
+            del(self._table_threads[table])
 
         try:
             connection.close()

@@ -71,10 +71,8 @@ if 'load' in value:
 else:
 	log.info("Old load: 'none'. New load: '%.3f'." % args.load)
 
-value['load'] = args.load
-
 # And update the DB
-r.table(args.rethinkdb_servers).get(key).update(value).run(conn)
+r.table(args.rethinkdb_servers).get(key).update({'load': args.load}).run(conn)
 
 # All done
 conn.close()

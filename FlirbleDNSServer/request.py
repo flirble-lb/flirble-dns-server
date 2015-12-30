@@ -140,6 +140,8 @@ class Request(object):
     zone the request is for, process it and return a DNS packet to be used
     as the reply.
 
+    Since this may be called from threads, this is reentrant.
+
     @params data str A raw, complete DNS datagram.
     @params address str The IP address from which the datagram originated.
                 This can be either an IPv4 or an IPv6 address. It can also be
@@ -202,6 +204,8 @@ class Request(object):
     """
     If the zone 'qname' exists, dispatches to the correct method to handle it.
 
+    Since this may be called from threads, this is reentrant.
+
     @param qname str The record name.
     @param qtype str|tuple The record type(s) being asked for.
     @param state RequestState The state tracking object for this request.
@@ -228,7 +232,10 @@ class Request(object):
         # Do we awnser for such a zone?
         with self.zlock:
             if qname in self.zones:
-                zone = self.zones[qname]
+                if fdns.paranoid:
+                    zone = copy.deepcopy(self.zones[qname])
+                else:
+                    zone = self.zones[qname]
             else:
                 zone = None
 
@@ -252,6 +259,8 @@ class Request(object):
     This uses zone record details in the zone to formulate a reply to the
     query. The supported DNS resource records are documented in the method
     _construct_rdata().
+
+    Since this may be called from threads, this is reentrant.
 
     @param qname str The record name.
     @param qtype str|tuple The record type(s) being asked for.
@@ -306,6 +315,8 @@ class Request(object):
     GeoIP lookup failing or all candidate servers are filtered because of
     load issues) then, if the zone configuration provides them, fallback
     a static response will occur using the handle_static() method.
+
+    Since this may be called from threads, this is reentrant.
 
     @param qname str The record name.
     @param qtype str|tuple The record type(s) being asked for.
@@ -363,6 +374,7 @@ class Request(object):
                             else:
                                 servers.append(server)
 
+            # If no servers added to the list, try to use the default set
             if len(servers) == 0:
                 if 'default' in self.servers:
                     if fdns.debug:
@@ -374,12 +386,12 @@ class Request(object):
                         servers = self.servers['default']
                 else:
                     if fdns.debug:
-                        log.debug("No servers found; no default found; this may break!")
+                        log.debug("No servers found; no default found; expect a non-geo reponse")
                     servers_set = ('unknown',)
 
 
         # if we have servers to look at...
-        if self.geo is not None and servers is not None:
+        if self.geo is not None and len(servers) != 0:
             # check if we were given an ipv6-encoded-as-ipv6 address
             client = state.address[0]
             if client.startswith('::ffff:'):
@@ -407,6 +419,7 @@ class Request(object):
                         if fdns.debug:
                             log.debug('handle_geo_dist using cached result for %s' % repr(skey))
 
+            # No cached entry; we need to go work it out
             if selected is None:
                 # go find the closest set of servers to the client address
                 if fdns.debug:

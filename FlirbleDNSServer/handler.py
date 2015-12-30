@@ -37,8 +37,8 @@ class BaseRequestHandler(SocketServer.BaseRequestHandler):
 
     """
     Called when an incoming packet is detected on a socket. This method
-    invokes the subclasses get_data() method to retrieve the packet and then
-    dispatches it to the handler in self.response.
+    invokes the get_data() method on the subclassed object to retrieve the
+    packet and then dispatches it to the handler in self.response.
     """
     def handle(self):
         if fdns.debug:
