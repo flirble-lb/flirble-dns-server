@@ -1,0 +1,96 @@
+#!/usr/bin/env python
+# Setup a RethinkDB database for the Flirble DNS Server
+
+import os, logging
+log = logging.getLogger(os.path.basename(__file__))
+
+import argparse, sys, json
+import rethinkdb as r
+
+# Defaults for the command line options.
+DEBUG = False
+LOGFILE = None
+LOGLEVEL = "info"
+
+RETHINKDB_HOST = "localhost"
+RETHINKDB_PORT = "28015"
+RETHINKDB_NAME = "flirble_dns"
+RETHINKDB_ZONES = "zones"
+RETHINKDB_SERVERS = "servers"
+
+SOURCE_ZONES = "zones.json"
+SOURCE_SERVERS = "servers.json"
+
+TABLES="zones,servers"
+
+# Build the command line parser
+parser = argparse.ArgumentParser(description="Initial data loder for Flirble DNS Server")
+main = parser.add_argument_group("Main options")
+main.add_argument("-d", "--debug", default=DEBUG, action="store_true", help="Print extra diagnostic data. Implies --foreground and --log-level=debug. [%s]" % str(DEBUG))
+main.add_argument("--log-file", metavar="filename", default=LOGFILE, help="File to send logging output to. [%s]" % "stderr" if LOGFILE is None else LOGFILE)
+main.add_argument("--log-level", default=LOGLEVEL, choices=["debug", "info", "warning", "error", "critical"], help="Logging level. [%s]" % LOGLEVEL.lower())
+main.add_argument("--tables", default=TABLES, metavar="table_list", help="List of tables to initialize. Use a comma to delimit items. [%s]" % TABLES)
+
+db = parser.add_argument_group("RethinkDB options")
+db.add_argument("--rethinkdb-host", metavar="name", default=RETHINKDB_HOST, help="Connection host for RethinkDB server. [%s]" % RETHINKDB_HOST)
+db.add_argument("--rethinkdb-port", metavar="name", default=RETHINKDB_PORT, help="Connection port for RethinkDB server. [%s]" % RETHINKDB_PORT)
+db.add_argument("--rethinkdb-name", metavar="string", default=RETHINKDB_NAME, help="RethinkDB database name. [%s]" % RETHINKDB_NAME)
+db.add_argument("--rethinkdb-zones", metavar="table", default=RETHINKDB_ZONES, help="Zones table name. [%s]" % RETHINKDB_ZONES)
+db.add_argument("--rethinkdb-servers", metavar="table", default=RETHINKDB_SERVERS, help="Servers table name. [%s]" % RETHINKDB_SERVERS)
+
+src = parser.add_argument_group("Source data options")
+src.add_argument("--source-zones", metavar="filename", default=SOURCE_ZONES, help="Zones source JSON file. [%s]" % SOURCE_ZONES)
+src.add_argument("--source-servers", metavar="filename", default=SOURCE_SERVERS, help="Servers source JSON file. [%s]" % SOURCE_SERVERS)
+
+# Run the command line parser
+args = parser.parse_args()
+
+if args.debug:
+    args.log_level = "debug"
+
+# Turn the table list into a list
+args.tables = args.tables.split(",")
+
+# Setup logging
+logging.basicConfig(filename=args.log_file, level=getattr(logging, args.log_level.upper(), None))
+
+# Connect
+conn = r.connect(host=args.rethinkdb_host, port=args.rethinkdb_port, db=args.rethinkdb_name)
+
+# Setup a hash of our initialization information
+meta = {
+	"zones": {
+		"table": args.rethinkdb_zones,
+		"file": args.source_zones
+	},
+	"servers": {
+		"table": args.rethinkdb_servers,
+		"file": args.source_servers
+	}
+}
+
+# Run over the tables, setting them up
+for table in meta:
+	if table in args.tables:
+		m = meta[table]
+
+		log.info("Initializing %s:" % table)
+
+		# Delete any existing tables with our names
+		log.info("  Deleting any existing table named '%s'." % m['table'])
+		r.db(args.rethinkdb_name).table_drop(m['table']).run(conn)
+
+		# Create new tables with the correct options
+		log.info("  Creating table '%s'." % m['table'])
+		r.db(args.rethinkdb_name).table_create(m['table'], primary_key="name").run(conn)
+
+		# Load initial data
+		log.info("  Loading initial data from file '%s' into table '%s'." % (m['file'], m['table']))
+		with open(m['file']) as fp:
+			r.db(args.rethinkdb_name).table(m['table']).insert(json.load(fp)).run(conn)
+
+		log.info("Initialization of %s complete." % table)
+
+# All done
+conn.close()
+log.info("All done.")
