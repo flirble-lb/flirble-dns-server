@@ -69,6 +69,14 @@
 			{
 				"type": "AAAA",
 				"value": "2001:dba:10::10:20:30:40"
+			},
+			{
+				"type": "TXT",
+				"value": "name:flirble!fallback"
+			},
+			{
+				"type": "TXT",
+				"value": "city:somewhere"
 			}
 		]
 	}
