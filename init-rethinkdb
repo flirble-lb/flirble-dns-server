@@ -26,7 +26,7 @@ TABLES="zones,servers"
 # Build the command line parser
 parser = argparse.ArgumentParser(description="Initial data loder for Flirble DNS Server")
 main = parser.add_argument_group("Main options")
-main.add_argument("-d", "--debug", default=DEBUG, action="store_true", help="Print extra diagnostic data. Implies --foreground and --log-level=debug. [%s]" % str(DEBUG))
+main.add_argument("-d", "--debug", default=DEBUG, action="store_true", help="Print extra diagnostic data. Implies --log-level=debug. [%s]" % str(DEBUG))
 main.add_argument("--log-file", metavar="filename", default=LOGFILE, help="File to send logging output to. [%s]" % "stderr" if LOGFILE is None else LOGFILE)
 main.add_argument("--log-level", default=LOGLEVEL, choices=["debug", "info", "warning", "error", "critical"], help="Logging level. [%s]" % LOGLEVEL.lower())
 main.add_argument("--tables", default=TABLES, metavar="table_list", help="List of tables to initialize. Use a comma to delimit items. [%s]" % TABLES)
