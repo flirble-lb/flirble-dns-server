@@ -263,6 +263,9 @@ The attributes here are:
 `./dns-server --help`
 `./dns-server --debug`
 
+
+### Network ports
+
 By default the DNS server will try to bind to port `8053` meaning that it
 will happily run as an unprivileged user, but won't respond to DNS queries
 on the standard port `53`.
@@ -319,6 +322,16 @@ addresses in different parts of the world and binding them to the loopback
 interface will mean you can test each of those regions by simply directing
 your query to that address; though caution is advised since this will cut
 your computer off from reaching the real host of those addresses.
+
+
+### Threads and concurrency
+
+The DNS server tracks the number of request handling threads it has running
+at a given time. The server caps the number of threads it will spawn by
+default to 128. This can be specified on the command line with `--threads`.
+
+Any requests arriving when the maximum number of threads are already running
+will simply be ignored.
 
 
 ## Loading initial data

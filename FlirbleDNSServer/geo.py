@@ -117,7 +117,7 @@ class Geo(object):
 
         for server in servers:
             # check server load, if applicable
-            # if the server reports a negavitve valye for load then consider
+            # if the server reports a negative value for load then consider
             # it unavailable
             if 'load' in server:
                 if float(server['load']) < 0.0:
