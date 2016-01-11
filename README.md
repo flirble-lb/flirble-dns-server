@@ -34,7 +34,7 @@ reliability concerns.
 
 # Installation
 
-See INSTALL.md for installation details.
+See [`INSTALL.md`](INSTALL.md) for installation details.
 
 
 # Setup and running the DNS server
@@ -54,9 +54,12 @@ zone data.
 
 ## Zone data
 
-Refer to the file `zones.json` for a complete example. Zone data refers to
-the naming of DNS resource records and specifying what information to respond
-with whenthat name is queried.
+Refer to the file [`zones.json`](zones.json) for a complete example. Zone data
+refers to the naming of DNS resource records and specifying what information
+to respond with when that name is queried.
+
+
+### Static zone
 
 DNS resource records are indicated with a straightforward JSON structure:
 
@@ -104,7 +107,7 @@ Any familiarity with DNS should render these entries should be quite obvious.
     numbers for the zone time values, e.g.
     `"times": [ 2015010100, 3600, 10800, 86400, 3600 ]`.
 
-    Note most of the values are normally used by downstream zone
+    Note most of the values in `times` are normally used by downstream zone
     secondary servers. Since this implementation does not support zone
     transfers such values have only an informational purpose here. The only
     value that is otherwise of value is the negative-TTL since it can be used
@@ -123,6 +126,8 @@ Any familiarity with DNS should render these entries should be quite obvious.
         should consider a negative result to be valid before repeating the
         same request.
 
+
+### Geo-dist zone
 
 There are some additional values required for a `geo-dist` zone, for example:
 
@@ -181,10 +186,10 @@ There are some additional values required for a `geo-dist` zone, for example:
 
 ## Server data
 
-Refer to the file `servers.json` for a complete example. Server data is the
-information use to determine candidate servers whose details may be included
-in a DNS response. These details include the geographic location of the
-server, its current "load" and so on.
+Refer to the file [`servers.json`](servers.json) for a complete example.
+Server data is the information use to determine candidate servers whose
+details may be included in a DNS response. These details include the
+geographic location of the server, its current "load" and so on.
 
 The structure is straightforward. Servers are clustered into "groups" which
 a zone file may reference to include that group of servers in the candidate
