@@ -29,99 +29,12 @@ for each server.
 This system is not meant to be a replacement for a more robust commercial
 solution, such as from a content delivery network. In particular there may
 be performance issues with this implmenetation and certainly long term
-relibability concerns.
+reliability concerns.
 
 
 # Installation
 
-Outside the scope of this README at the moment: Setup a RethinkDB host or
-cluster.
-
-There are two sections here; one for Ubuntu hosts installing a bunch of
-Python packages by hand, and a second group showing how to install these
-same things from backported packages (which I may make available somewhere
-someday.)
-
-
-## Ubuntu 14.02 depdendencies
-
-```
-sudo apt-get install -y build-essential git autoconf automake libtool \
-    python-dev python-pip zlib1g-dev libcurl4-openssl-dev \
-    python-daemon python-lockfile
-
-sudo pip install dnslib
-sudo pip install rethinkdb
-```
-
-If the Ubuntu `python-lockfile` package is too old, you may also need to
-`sudo pip install lockfile` to make the pidlockfile method available.
-
-
-### Setup GeoIP2 database
-
-```
-cd
-mkdir -p dev
-cd dev
-git clone https://github.com/maxmind/geoipupdate.git
-cd geoipupdate
-./bootstrap && ./configure && make && sudo make install
-cd ..
-
-sudo tee /usr/local/etc/GeoIP.conf <<EOT
-UserId 999999
-LicenseKey 000000000000
-ProductIds GeoLite2-City GeoLite2-Country GeoLite-Legacy-IPv6-City GeoLite-Legacy-IPv6-Country 506 517 533
-EOT
-
-sudo mkdir -p /usr/local/share/GeoIP
-
-sudo addgroup --system geoip
-sudo adduser --system --no-create-home --gecos GeoIP --home /usr/local/share/GeoIP --group geoip
-
-sudo chown geoip:geoip /usr/local/share/GeoIP
-
-echo "13 1 * * 3 geoip /usr/local/bin/geoipupdate" | sudo tee /etc/cron.d/geoipupdate
-
-sudo -u geoip /usr/local/bin/geoipupdate
-```
-
-### Install the Python bindings for GeoIP2
-
-```
-git clone --recursive https://github.com/maxmind/libmaxminddb.git
-cd libmaxminddb
-./bootstrap && ./configure && make && sudo make install
-
-sudo pip install maxminddb
-sudo pip install geoip2
-```
-
-
-## Ubuntu 14.02 dependencies with backported packages
-
-This assumes availability of a directory of backported (from Vivid)
-or otherwise built-for-trusty packages for GeoIP, ZeroMQ and dnslib.
-
-```
-sudo apt-get install -y git python-daemon python-ipaddr libpgm-5.1-0
-sudo dpkg -i \
-	libmaxminddb0_1.0.4-2_amd64.deb \
-	libsodium13_1.0.3-1_amd64.deb \
-	libzmq3_4.0.5+dfsg-3ubuntu1~gcc5.1_amd64.deb \
-	geoip-bin_1.6.6-1_amd64.deb \
-	geoipupdate_2.2.1-1_amd64.deb \
-	mmdb-bin_1.0.4-2_amd64.deb \
-	python-dnslib_0.9.4-1_all.deb \
-	python-maxminddb_1.2.0-1_amd64.deb \
-	python-geoip2_2.2.0-1_all.deb \
-	python-lockfile_0.10.2-2ubuntu1_all.deb \
-	python-zmq_14.4.1-0ubuntu5_amd64.deb
-```
-
-TODO: find/build rethinkb client .deb
-
+See INSTALL.md for installation details.
 
 ### Setup and fetch GeoIP data
 
@@ -146,13 +59,195 @@ sudo -u geoip /usr/bin/geoipupdate
 ```
 
 
-# Setup
+# Setup and running the DNS server
 
 ## JSON files
 
 Two example source files, `zones.json` and `servers.json`, provide a
 reference to the contents of the database. You can load these sample
 files, or other initial data, using `setup-rethinkdb`. See below.
+
+JSON files are only a starting point. The database is part of a dynamic
+system and the JSON files are just the initial dataset. Both zones and
+server data can be updated in the database at run-time and in real-time.
+It is naturally expected that server data will receive more updates than
+zone data.
+
+
+## Zone data
+
+Refer to the file `zones.json` for a complete example. Zone data refers to
+the naming of DNS resource records and specifying what information to respond
+with whenthat name is queried.
+
+DNS resource records are indicated with a straightforward JSON structure:
+
+```json
+[
+	{
+		"name": "ns0.l.flirble.org.",
+		"type": "static",
+		"ttl": 3600,
+		"rr": [
+			{
+				"type": "A",
+				"value": "192.168.10.10"
+			},
+	}
+]
+```
+
+Aany familiarity with DNS should render these entries should be quite obvious.
+
+* `name` _(string)_ is the RR name and must be fully qualified and include the
+  final "`.`". The
+* `type` (_string)_ field indicates how the DNS server will interpret the
+  zone. Valid types currently include `static` for fixed entries and
+  `geo-dist` for entries that will respond dynamically based on server load,
+  distance, etc.
+* `ttl` (_int_) is optional and provides the time-to-live integer value for
+  DNS responses. The system default is 3600 seconds.
+* `rr` _(list)_ contains the DNS resource records itself. This is a list of
+  dictionaries, each containg one record for the name. Each entry typically
+  has both a `type` field and a `value` field. The values are always strings
+  unless otherwise noted.
+  * `type` _(string)_ specifies the DNS record type. Valid values include
+    `A`, `AAAA`, `CNAME`, `NS`, `MX` `PTR`, `SOA` `TXT` and `PTR`
+  * `value` _(string)_ is required for types `A`, `AAAA`, `CNAME`, `NS`, `MX`,
+    `PTR`, `TXT` and `PTR`.
+  * `pref` _(int)_ is required for type `MX`.
+  * `mname` _(string)_ is required for type `SOA`.
+  * `rname` _(string)_ is required for type `SOA`.
+  * `times` _(list)_ is required for type `SOA` and must be a list numbers
+    for the zone time values.
+
+There are some additional values required for a `geo-dist` zone, for example:
+
+```json
+[
+	{
+		"name": "g.l.flirble.org.",
+		"type": "geo-dist",
+		"groups": "flirble",
+		"ttl": 5,
+		"params": {
+			"maxreplies": 2,
+			"maxload": 10,
+			"maxage": 120,
+			"maxdist": 10000,
+			"precision": 50
+		},
+		"rr": [
+			...
+		]
+	}
+]
+```
+
+* `groups` _(string or list)_ provides a list of server groups this zone will
+  use for responses. These groups and their servers are defined in the
+  _Server Data_ section. The list can be either a JSON list (e.g.
+  `["one", "two"]`) or a comma-delimited list (e.g. `"one,two"`) inside a
+  string.
+* `params` _(dict)_ gives a set of operational parameters that are used when
+  evaluating whether a server should be included in a DNS response.
+  * `maxreplies` _(int)_ specifies the maximum number of servers to include
+    in a response (assuming they all qualify for being in the response at
+    all!) If not given, the default is `1`.
+  * `maxload` _(float)_ signals the maximum reported server load to remain a
+    candidate. Server loads can be reported in real-time and this value sets
+    a cap on what is acceptable. This value is optional; if absent then no
+    such load checking is performed for this zone.
+  * `maxage` _(float)_ gives a maximum age of an update to be considered
+    relevant. The updates that provide server load can contain a timestamp;
+    if `maxage` is given then the age of the data can be checked and if too
+    old the entry is ignored. This is optional; if not provided then no
+    staleness checking is done.
+  * `maxdist` _(float)_ indicates a maximum geographic distance to be allowed
+    in the response. If not specified here then there is no limit. Currently
+    distance is measured as approximately miles.
+  * `precision` _(float)_ optionally governs how precise distance comparisons
+    are. Distance calculations are rounded down to the nearest multiple of
+    this value. If not specified the default value is `50.0` which will round
+    values to the nearest 50 miles-ish.
+* `rr` _(list)_ is optional for this zone type; if provided then its contents
+  are used as a fallback should the `geo-dist` method fail to produce any
+  results either because of some processing error or because no servers
+  qualified.
+
+
+## Server data
+
+Refer to the file `servers.json` for a complete example. Server data is the
+information use to determine candidate servers whose details may be included
+in a DNS response. These details include the geographic location of the
+server, its current "load" and so on.
+
+The structure is straightforward. Servers are clustered into "groups" which
+a zone file may reference to include that group of servers in the candidate
+list. Each group contains a list of the servers it contains, and each server
+is defined by a dictionary of key/values.  To maintain efficiency when
+updates are distributed by the database the "group" and server "name" are
+joined to form a compound key; group "`flirble`" and server "`castaway`"
+becomes the key "`flirble!castaway`".
+
+For example:
+
+```json
+[
+    {
+        "name": "default",
+        "city": "none",
+        "lat": 0,
+        "lon": 0,
+        "ipv4": "10.0.0.1",
+        "ipv6": "2001:db8::1",
+        "load": 0.0,
+        "ts": -1.0
+    },
+    {
+        "name": "flirble!castaway",
+        "city": "nyc",
+        "lat": 40.7127,
+        "lon": -74.0059,
+        "ipv4": "207.162.195.200",
+        "ipv6": "2001:6f8:0:102::1000:1",
+        "load": -1.0,
+        "ts": 0.0
+    }
+]
+```
+
+The attributes here are:
+
+* `name` _(string)_ is the name of this entry; it is usually a compound of
+  the group name and the server name with a delimiting "`!`". A "`default`"
+  entry may be provided and is used only when none of the other servers
+  qualify as candidates.
+* `city` _(string)_ is an informational field indicating the location of the
+  server. This is not currently used other than in diagnostic `TXT` records.
+* `lat` _(float)_ gives the latitude of the server location. Depending on
+  the precision you are attempting to use, the `lat` and `lon` do not normally
+  need to be especially accurate.
+* `lon` _(float)_ gives the longitude of the server location.
+* `ipv4` _(float)_ indicates the IPv4 address to use in an `A` record for
+  this server.
+* `ipv6` _(float)_ indicates the IPv6 address to use in an `AAAA` record for
+  this server.
+* `load` _(float)_ indicates the current load of the server. It is expected
+  this value will be updated periodically (and possibly often). If the value
+  given is a negative number then the server is assume unavailable.
+* `ts` _(float)_ is the timestamp of this entry. If the zone provides the
+  `maxage` parameter then the age of the update (current time subtract `ts`)
+  is checked and if considered stale this entry will not be considered in the
+  response. If the value of this field is negative then the entry is
+  considered static and this overrides the staleness check. For an initial
+  load this value should be `0.0` to prevent the server becoming a candidate
+  until a runtime update is provided or `-1.0` if this is not a dynamic system
+  and the entry should always be considered regardless of age. The `ts`
+  value is a count of the number of seconds since `1970-01-01T00:00:00`,
+  otherwise known as the UNIX epoch.
+
 
 ## Running `dns-server`
 
@@ -213,17 +308,21 @@ perform a GeoIP lookup. To test GeoIP and dynamic responses the use of
 IP aliases on the loopback interface will help. Strategically choosing
 addresses in different parts of the world and binding them to the loopback
 interface will mean you can test each of those regions by simply directing
-your query to that address; though note it will cut your computer off from
-reaching the real host of those addresses.
+your query to that address; though caution is advised since this will cut
+your computer off from reaching the real host of those addresses.
 
 
-## Loading data
+## Loading initial data
 
 Several options to this program govern what JSON files it will load and
 where it will try to store them.
 
 `./setup-rethinkdb --help`
 `./setup-rethinkdb --debug`
+
+By default it will try to connect to a RethinkDB on `localhost` at the usual
+port `28015` and will load `zones.json` and `servers.json` from the current
+directory and load them into the `zones` and `servers` tables respectively.
 
 
 ## Updating server load
@@ -235,3 +334,8 @@ consideration as a target.
 `./update-server-load --help`
 `./update-server-load --group flirble --name castaway --load $(date +%M.%S)`
 `./update-server-load -g flirble -n castaway -l $(date +%M.%S) --rethinkdb-port 28016`
+
+This program also provides a timestamp for the update; you can indicate this
+is a static entry with `--static`; otherwise the timestamp is compared to the
+`maxage` value of the zone, if present. If the update is stale (older than
+allowed by `maxage`) then it's not a candidate for DNS responses.
