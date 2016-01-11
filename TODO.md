@@ -36,3 +36,5 @@
 
 * Optionally allow SOA serial number to be generated at runtime (eg, based
   on the current time)
+
+* Support zone transfers and notification?

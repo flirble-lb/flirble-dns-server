@@ -75,10 +75,10 @@ DNS resource records are indicated with a straightforward JSON structure:
 ]
 ```
 
-Aany familiarity with DNS should render these entries should be quite obvious.
+Any familiarity with DNS should render these entries should be quite obvious.
 
 * `name` _(string)_ is the RR name and must be fully qualified and include the
-  final "`.`". The
+  final "`.`".
 * `type` (_string)_ field indicates how the DNS server will interpret the
   zone. Valid types currently include `static` for fixed entries and
   `geo-dist` for entries that will respond dynamically based on server load,
@@ -90,14 +90,39 @@ Aany familiarity with DNS should render these entries should be quite obvious.
   has both a `type` field and a `value` field. The values are always strings
   unless otherwise noted.
   * `type` _(string)_ specifies the DNS record type. Valid values include
-    `A`, `AAAA`, `CNAME`, `NS`, `MX` `PTR`, `SOA` `TXT` and `PTR`
+    `A`, `AAAA`, `CNAME`, `NS`, `MX` `PTR`, `SOA` `TXT` and `PTR`.
   * `value` _(string)_ is required for types `A`, `AAAA`, `CNAME`, `NS`, `MX`,
     `PTR`, `TXT` and `PTR`.
-  * `pref` _(int)_ is required for type `MX`.
-  * `mname` _(string)_ is required for type `SOA`.
-  * `rname` _(string)_ is required for type `SOA`.
-  * `times` _(list)_ is required for type `SOA` and must be a list numbers
-    for the zone time values.
+  * `pref` _(int)_ is required for type `MX` and is the preference value for
+    this mail exchanger entry.
+  * `mname` _(string)_ is required for type `SOA`. This is the name of the
+    primary nameserver for this zone.
+  * `rname` _(string)_ is required for type `SOA`. This is the name of the
+    "responsible party" for the zone. Typically this is an email address with
+    the `@` changed to `.`.
+  * `times` _(list)_ is required for type `SOA` and must be a list of five
+    numbers for the zone time values, e.g.
+    `"times": [ 2015010100, 3600, 10800, 86400, 3600 ]`.
+
+    Note most of the values are normally used by downstream zone
+    secondary servers. Since this implementation does not support zone
+    transfers such values have only an informational purpose here. The only
+    value that is otherwise of value is the negative-TTL since it can be used
+    by resolvers.
+
+    The values in the list are:
+      * The serial number for this ZONE and subordinate records. This is often
+        a timestamp but it's only required that the value increment with
+        changes to the zone or its contents.
+      * The number of seconds between refreshes of the zone by a secondary.
+        See the note under "serial number."
+      * The number of seconds after which a failed refresh should be reried.
+      * The upper limit of seconds before a zone is no longer considered
+        authoritative.
+      * The negative time-to-live; a count of how many seconds a resolver
+        should consider a negative result to be valid before repeating the
+        same request.
+
 
 There are some additional values required for a `geo-dist` zone, for example:
 
