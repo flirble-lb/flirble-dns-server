@@ -155,8 +155,8 @@ class Geo(object):
             # see if the zone specifies a maximum distance; a negative value
             # (or the value is not present) means no limit
             if 'maxdist' in params:
-                maxdist = float(params['maxdist']):
-                if maxdist >= 0.0 and dist > maxdist
+                maxdist = float(params['maxdist'])
+                if maxdist >= 0.0 and dist > maxdist:
                     continue
 
             # check if the server is closer than (or the same distance as)
