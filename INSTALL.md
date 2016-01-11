@@ -53,6 +53,7 @@ echo "13 1 * * 3 geoip /usr/local/bin/geoipupdate" | sudo tee /etc/cron.d/geoipu
 sudo -u geoip /usr/local/bin/geoipupdate
 ```
 
+
 ### Install the Python bindings for GeoIP2
 
 ```
@@ -88,3 +89,25 @@ sudo dpkg -i \
 
 TODO: find/build rethinkb client .deb
 
+
+### Setup and fetch GeoIP data
+
+```
+sudo tee /etc/GeoIP.conf <<EOT
+DatabaseDirectory /usr/local/share/GeoIP
+UserId 999999
+LicenseKey 000000000000
+ProductIds GeoLite2-City GeoLite2-Country GeoLite-Legacy-IPv6-City GeoLite-Legacy-IPv6-Country 506 517 533
+EOT
+
+sudo mkdir -p /usr/local/share/GeoIP
+
+sudo addgroup --system geoip
+sudo adduser --system --no-create-home --gecos GeoIP --home /usr/local/share/GeoIP --group geoip
+
+sudo chown geoip:geoip /usr/local/share/GeoIP
+
+echo "13 1 * * 3 geoip /usr/bin/geoipupdate" | sudo tee /etc/cron.d/geoipupdate
+
+sudo -u geoip /usr/bin/geoipupdate
+```
