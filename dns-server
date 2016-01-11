@@ -61,7 +61,8 @@ if fdns.debug:
     args.foreground = True
 
 # Setup logging
-logging.basicConfig(filename=args.log_file, level=getattr(logging, args.log_level.upper(), None))
+logging.basicConfig(filename=args.log_file,
+    level=getattr(logging, args.log_level.upper(), None))
 
 # If we're in a diagnostic mode then do some special stuff for logging
 if args.log_file is None and args.foreground is False:
@@ -102,7 +103,8 @@ if args.rethinkdb_host is not None: # and args.rethinkdb_host != "":
 
     rdb = fdns.Data(remote=args.rethinkdb_host, name=args.rethinkdb_name)
     if rdb == False or rdb.start() == False:
-        raise Exception("Cannot start DNS server: %s" % "Failed to connect to RethinkDB")
+        raise Exception("Cannot start DNS server: %s" %
+            "Failed to connect to RethinkDB")
 
 # Set the maxthreads value
 fdns.MAXIMUM_HANDLER_THREADS = args.max_threads
@@ -139,7 +141,8 @@ if args.foreground is False:
 # And now do some real work
 try:
     # Fire it all up!
-    server = fdns.Server(rdb, args.address, args.port, args.zones, args.servers, args.geodb)
+    server = fdns.Server(rdb, args.address, args.port, args.zones,
+        args.servers, args.geodb)
     server.run()
 except Exception as e:
     log.error("Exception when running the DNS server:\n%s." % e.message)

@@ -47,7 +47,8 @@ class Server(object):
     @param geodb str The Maxmind GeoIP database that the Geo class should
                 load. Default is None.
     """
-    def __init__(self, rdb, address=ADDRESS, port=PORT, zones=None, servers=None, geodb=None):
+    def __init__(self, rdb, address=ADDRESS, port=PORT, zones=None,
+        servers=None, geodb=None):
         super(Server, self).__init__()
 
         log.debug("Initializing Geo module.")
@@ -57,10 +58,14 @@ class Server(object):
         request = fdns.Request(rdb=rdb, zones=zones, servers=servers, geo=geo)
 
         self.servers = []
-        log.debug("Initializing UDP server for '%s' port %d." % (address, port))
-        self.servers.append(fdns.UDPServer((address, port), fdns.UDPRequestHandler, request))
-        log.debug("Initializing TCP server for '%s' port %d." % (address, port))
-        self.servers.append(fdns.TCPServer((address, port), fdns.TCPRequestHandler, request))
+        log.debug("Initializing UDP server for '%s' port %d." %
+            (address, port))
+        self.servers.append(fdns.UDPServer((address, port),
+            fdns.UDPRequestHandler, request))
+        log.debug("Initializing TCP server for '%s' port %d." %
+            (address, port))
+        self.servers.append(fdns.TCPServer((address, port),
+            fdns.TCPRequestHandler, request))
 
         self.request = request
         self.geo = geo

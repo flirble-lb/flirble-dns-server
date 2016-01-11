@@ -70,11 +70,15 @@ class Data(object):
     @returns bool True on success, False otherwise.
     """
     def start(self):
-        log.info("Connecting to RethinkDB at '%s:%s' db '%s'." % (self._host, self._port, self._name))
+        log.info("Connecting to RethinkDB at '%s:%s' db '%s'." %
+            (self._host, self._port, self._name))
         try:
-            self.r = r.connect(host=self._host, port=self._port, db=self._name, auth_key=self._auth, ssl=self._ssl)
+            self.r = r.connect(host=self._host, port=self._port,
+                db=self._name, auth_key=self._auth, ssl=self._ssl)
         except r.ReqlDriverError as e:
-            log.error("Unable to connect to RethinkDB at '%s:%s' db '%s': %s." % (self._host, self._port, self._name, e.message))
+            log.error("Unable to connect to RethinkDB at '%s:%s' " \
+                "db '%s': %s." %
+                (self._host, self._port, self._name, e.message))
             log.debug("%s." % traceback.format_exc())
             return False
 
@@ -104,11 +108,15 @@ class Data(object):
         if table in self._table_threads:
             return False
 
-        log.info("Connecting to RethinkDB at '%s:%s' db '%s' to monitor table '%s'." % (self._host, self._port, self._name, table))
+        log.info("Connecting to RethinkDB at '%s:%s' db '%s' to monitor " \
+            "table '%s'." % (self._host, self._port, self._name, table))
         try:
-            connection = r.connect(host=self._host, port=self._port, db=self._name, auth_key=self._auth, ssl=self._ssl)
+            connection = r.connect(host=self._host, port=self._port,
+                db=self._name, auth_key=self._auth, ssl=self._ssl)
         except r.ReqlDriverError as e:
-            log.error("Unable to connect to RethinkDB at '%s:%s' db '%s': %s." % (self._host, self._port, self._name, e.message))
+            log.error("Unable to connect to RethinkDB at '%s:%s' " \
+                "db '%s': %s." %
+                (self._host, self._port, self._name, e.message))
             log.debug("%s." % traceback.format_exc())
             return False
 
@@ -121,7 +129,8 @@ class Data(object):
         try:
             t = threading.Thread(target=self._monitor_thread, kwargs=args)
         except Exception as e:
-            log.error("Unable to start monitoring thread for table '%s': %s." % (table, e.message))
+            log.error("Unable to start monitoring thread for " \
+                "table '%s': %s." % (table, e.message))
             log.debug("%s." % traceback.format_exc())
             connection.close()
             return False
@@ -158,7 +167,8 @@ class Data(object):
             if not self.running:
                 break
 
-        log.info("Closing RethinkDB connection for monitoring table '%s'." % table)
+        log.info("Closing RethinkDB connection for " \
+            "monitoring table '%s'." % table)
 
         with self._tlock:
             del(self._table_threads[table])
@@ -179,7 +189,8 @@ class Data(object):
 
         for table in self._table_threads:
             tt = self._table_threads[table]
-            log.debug("Waiting for thread monitoring table '%s' to stop..." % table)
+            log.debug("Waiting for thread monitoring " \
+                "table '%s' to stop..." % table)
             tt['thread'].join(1)
 
         log.info("Closing main RethinkDB connection...")

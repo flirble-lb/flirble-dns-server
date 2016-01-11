@@ -104,7 +104,8 @@ class TCPRequestHandler(BaseRequestHandler):
         while len(data) - 2 < sz:
             data += self.request.recv(self.max_packet_size)
         if sz < len(data) - 2:
-            raise Exception("TCP packet larger than expected (%d > %d)" % (sz, len(data)-2))
+            raise Exception("TCP packet larger than expected (%d > %d)" %
+                (sz, len(data)-2))
         return data[2:]
 
     """
@@ -190,7 +191,7 @@ class ThreadingMixIn:
                     (client_address[0], client_address[1],
                         self._handler_count))
 
-        """Start a new thread to process the request."""
+        # Start a new thread to process the request.
         t = threading.Thread(target = self.process_request_thread,
                              args = (request, client_address))
         t.daemon = self.daemon_threads
@@ -243,6 +244,7 @@ class TCPServer(ThreadingTCPServer):
     """Let threads die peacefully when the process dies."""
     daemon_threads = True
 
+    """The DNS handler that will handle requests."""
     response = None
 
     """

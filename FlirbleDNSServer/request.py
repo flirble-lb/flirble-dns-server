@@ -229,7 +229,8 @@ class Request(object):
         # handle recursion checking
         if (qname, qtype) in state.chain:
             if fdns.debug:
-                log.debug("handle_zone qname,qtype in chain, ignoring. qname=%s qtype=%s" % (qname, qtype))
+                log.debug("handle_zone qname,qtype in chain, ignoring. " \
+                    "qname=%s qtype=%s" % (qname, qtype))
             return None
         state.chain.append(qname)
 
@@ -256,7 +257,8 @@ class Request(object):
                 return self.handle_geo_dist(qname, qtype, zone, state, fn)
 
         if fdns.debug:
-            log.debug("handle_zone qname=%s qtype=%s not found" % (qname, qtype))
+            log.debug("handle_zone qname=%s qtype=%s not found" %
+                (qname, qtype))
 
         return False
 
@@ -294,7 +296,8 @@ class Request(object):
                 found = True
                 rdata = self._construct_rdata(rr)
                 rtype = getattr(dnslib.QTYPE, rr['type'])
-                self._add(state, fn, dnslib.RR(rname=qname, rtype=rtype, ttl=ttl, rdata=rdata))
+                self._add(state, fn, dnslib.RR(rname=qname, rtype=rtype,
+                    ttl=ttl, rdata=rdata))
 
                 # If we were asking for A/AAAA, and got something else, this
                 # will effectively query the A/AAAA of that thing.
@@ -394,7 +397,8 @@ class Request(object):
                         servers = self.servers['default']
                 else:
                     if fdns.debug:
-                        log.debug("No servers found; no default found; expect a non-geo reponse")
+                        log.debug("No servers found; no default found; " \
+                            "expect a non-geo reponse")
                     servers_set = ('unknown',)
 
 
@@ -425,13 +429,15 @@ class Request(object):
                     if time.time() < s[0]:
                         selected = s[1]
                         if fdns.debug:
-                            log.debug('handle_geo_dist using cached result for %s' % repr(skey))
+                            log.debug('handle_geo_dist using cached result " \
+                                "for %s' % repr(skey))
 
             # No cached entry; we need to go work it out
             if selected is None:
                 # go find the closest set of servers to the client address
                 if fdns.debug:
-                    log.debug('handle_geo_dist using calculated result for %s' % repr(skey))
+                    log.debug('handle_geo_dist using calculated result " \
+                        for %s' % repr(skey))
 
                 selected = self.geo.find_closest_server(servers, client, params)
 
@@ -456,15 +462,20 @@ class Request(object):
                             addrs = [addrs]
                         for addr in addrs:
                             found = True
-                            self._add(state, fn, dnslib.RR(rname=qname, rtype=dnslib.QTYPE.A, ttl=ttl, rdata=dnslib.A(addr)))
+                            self._add(state, fn, dnslib.RR(rname=qname,
+                                rtype=dnslib.QTYPE.A, ttl=ttl,
+                                rdata=dnslib.A(addr)))
 
-                    if 'ipv6' in server and self._check_qtype(qtype, ('ANY', 'AAAA')):
+                    if 'ipv6' in server and self._check_qtype(qtype,
+                                                        ('ANY', 'AAAA')):
                         addrs = server['ipv6']
                         if not isinstance(addrs, (list, tuple)):
                             addrs = [addrs]
                         for addr in addrs:
                             found = True
-                            self._add(state, fn, dnslib.RR(rname=qname, rtype=dnslib.QTYPE.AAAA, ttl=ttl, rdata=dnslib.AAAA(addr)))
+                            self._add(state, fn, dnslib.RR(rname=qname,
+                                rtype=dnslib.QTYPE.AAAA, ttl=ttl,
+                                rdata=dnslib.AAAA(addr)))
 
                     if (fdns.debug or ('debug' in zone and zone['debug'] == True)) and self._check_qtype(qtype, ('ANY', 'TXT')):
                         txt = []
@@ -473,7 +484,9 @@ class Request(object):
                                 txt.append('%s: %s' % (item, server[item]))
 
                         for item in txt:
-                            self._add(state, fn, dnslib.RR(rname=qname, rtype=dnslib.QTYPE.TXT, ttl=ttl, rdata=dnslib.TXT(item)))
+                            self._add(state, fn, dnslib.RR(rname=qname,
+                                rtype=dnslib.QTYPE.TXT, ttl=ttl,
+                                rdata=dnslib.TXT(item)))
 
                 return found
 
@@ -541,10 +554,13 @@ class Request(object):
     def _construct_rdata(self, rr):
         t = rr['type']
         if t == "SOA":
-            return dnslib.SOA(mname=rr['mname'], rname=rr['rname'], times=rr['times'])
+            return dnslib.SOA(mname=rr['mname'],
+                rname=rr['rname'],
+                times=rr['times'])
 
         if t == "MX":
-            return dnslib.MX(label=rr['value'], preference=rr['pref'])
+            return dnslib.MX(label=rr['value'],
+                preference=rr['pref'])
 
         if t in ('A', 'AAAA', 'NS', 'CNAME', 'TXT', 'PTR'):
             cls = dnslib.RDMAP[t]

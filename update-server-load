@@ -54,23 +54,27 @@ if args.debug:
     args.log_level = "debug"
 
 # Setup logging
-logging.basicConfig(filename=args.log_file, level=getattr(logging, args.log_level.upper(), None))
+logging.basicConfig(filename=args.log_file,
+	level=getattr(logging, args.log_level.upper(), None))
 
 # Connect
-conn = r.connect(host=args.rethinkdb_host, port=args.rethinkdb_port, db=args.rethinkdb_name)
+conn = r.connect(host=args.rethinkdb_host, port=args.rethinkdb_port,
+	db=args.rethinkdb_name)
 
 # First check the group and server values are valid
 key = "%s!%s" % (args.group, args.name)
 value = r.table(args.rethinkdb_servers).get(key).run(conn)
 
 if value is None:
-	log.error("No server in group '%s' with name '%s' exists." % (args.group, args.name))
+	log.error("No server in group '%s' with name '%s' exists." %
+		(args.group, args.name))
 	conn.close()
 	sys.exit(1)
 
 # Update the load value
 if 'load' in value:
-	log.info("Old load: '%.3f'. New load: '%.3f'." % (value['load'], args.load))
+	log.info("Old load: '%.3f'. New load: '%.3f'." %
+		(value['load'], args.load))
 else:
 	log.info("Old load: 'none'. New load: '%.3f'." % args.load)
 
