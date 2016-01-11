@@ -5,12 +5,15 @@
 import os, logging
 log = logging.getLogger(os.path.basename(__file__))
 
-import sys, time, datetime, socket
+import sys, time, datetime, socket, threading
 import traceback
 import SocketServer
 
 try: import FlirbleDNSServer as fdns
 except: import __init__ as fdns
+
+"""Default number of concurrent handler threads to run."""
+MAXIMUM_HANDLER_THREADS = 128
 
 """
 Base DNS handling SocketServer request handler.
@@ -117,14 +120,96 @@ class TCPRequestHandler(BaseRequestHandler):
 
 
 """
+Mix-in class to handle each request in a new thread. Based on the
+class of the same name in SocketServer.
+"""
+class ThreadingMixIn:
+
+    """Decides how threads will act upon termination of the
+    main process."""
+    daemon_threads = False
+
+    """Maximum number of concurrent handler threads to spawn."""
+    maximum_handler_threads = None
+
+    """A lock to wrap thread count variables."""
+    _clock = threading.Lock()
+
+    """The current thread counter."""
+    _handler_count = 0
+
+
+    """
+    Same as in BaseServer but as a thread.
+    In addition, exception handling is done here.
+    """
+    def process_request_thread(self, request, client_address):
+        try:
+            self.finish_request(request, client_address)
+            self.shutdown_request(request)
+        except:
+            self.handle_error(request, client_address)
+            self.shutdown_request(request)
+
+        # Work is done, lower the tide mark
+        with self._clock:
+            self._handler_count -= 1
+
+            if fdns.debug:
+                log.debug("Completed request from %s port %d decreases " \
+                    "thread count to %d." %
+                    (client_address[0], client_address[1],
+                        self._handler_count))
+
+
+    """
+    Request handler. Checks the thread count and if not too high then spawns
+    a thread to handle the request.
+    """
+    def process_request(self, request, client_address):
+        with self._clock:
+            if self.maximum_handler_threads is None:
+                self.maximum_handler_threads = fdns.MAXIMUM_HANDLER_THREADS
+
+            if self._handler_count >= self.maximum_handler_threads:
+                # Too many threads, ignore this request
+                # TODO: account for this
+                if fdns.debug:
+                    log.warning("Dropping request from (%s %d) because " \
+                        "thread count is at maximum of %d." %
+                        (client_address[0], client_address[1],
+                            self.maximum_handler_threads))
+                return
+
+            # We can spawn the thread, raise the tide
+            self._handler_count += 1
+
+            if fdns.debug:
+                log.debug("New request from (%s %d) increases thread " \
+                    "count to %d." %
+                    (client_address[0], client_address[1],
+                        self._handler_count))
+
+        """Start a new thread to process the request."""
+        t = threading.Thread(target = self.process_request_thread,
+                             args = (request, client_address))
+        t.daemon = self.daemon_threads
+        t.start()
+
+class ThreadingUDPServer(ThreadingMixIn, SocketServer.UDPServer): pass
+class ThreadingTCPServer(ThreadingMixIn, SocketServer.TCPServer): pass
+
+"""
 A subclass of SocketServer.ThreadingUDPServer that sets the parameters for
 our UDP server, including enabling IPv6.
 """
-class UDPServer(SocketServer.ThreadingUDPServer):
+class UDPServer(ThreadingUDPServer):
     """Bind to the IPv6 socket. On most systems this will also accept IPv4."""
     address_family = socket.AF_INET6
     """Allows the server to ignore lingering data from a previous socket."""
     allow_reuse_address = True
+    """Let threads die peacefully when the process dies."""
+    daemon_threads = True
 
     response = None
 
@@ -140,7 +225,7 @@ class UDPServer(SocketServer.ThreadingUDPServer):
                 presented to this handler.
     """
     def __init__(self, server_address, RequestHandlerClass, response=None):
-        SocketServer.ThreadingUDPServer.__init__(self, server_address, RequestHandlerClass)
+        ThreadingUDPServer.__init__(self, server_address, RequestHandlerClass)
 
         if response is not None:
             self.response = response
@@ -150,11 +235,13 @@ class UDPServer(SocketServer.ThreadingUDPServer):
 A subclass of SocketServer.ThreadingTCPServer that sets the parameters for
 our UDP server, including enabling IPv6.
 """
-class TCPServer(SocketServer.ThreadingTCPServer):
+class TCPServer(ThreadingTCPServer):
     """Bind to the IPv6 socket. On most systems this will also accept IPv4."""
     address_family = socket.AF_INET6
     """Allows the server to ignore lingering data from a previous socket."""
     allow_reuse_address = True
+    """Let threads die peacefully when the process dies."""
+    daemon_threads = True
 
     response = None
 
@@ -170,7 +257,7 @@ class TCPServer(SocketServer.ThreadingTCPServer):
                 presented to this handler.
     """
     def __init__(self, server_address, RequestHandlerClass, response=None):
-        SocketServer.ThreadingTCPServer.__init__(self, server_address, RequestHandlerClass)
+        ThreadingTCPServer.__init__(self, server_address, RequestHandlerClass)
 
         if response is not None:
             self.response = response

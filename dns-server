@@ -14,6 +14,7 @@ DEBUG = fdns.debug
 LOGFILE = None
 LOGLEVEL = "info"
 PIDFILE = "/var/run/flirble-dns-server.pid"
+MAXTHREADS = 128
 HOSTNAME = socket.gethostname()
 
 ADDRESS = '::'
@@ -34,6 +35,7 @@ main.add_argument("-d", "--debug", default=DEBUG, action="store_true", help="Pri
 main.add_argument("--log-file", metavar="filename", default=LOGFILE, help="File to send logging output to. [%s]" % "stderr" if LOGFILE is None else LOGFILE)
 main.add_argument("--log-level", default=LOGLEVEL, choices=["debug", "info", "warning", "error", "critical"], help="Logging level. [%s]" % LOGLEVEL.lower())
 main.add_argument("--pid-file", metavar="filename", default=PIDFILE, help="File to store the PID value in when daemonized. [%s]" % PIDFILE)
+main.add_argument("--max-threads", type=int, default=MAXTHREADS, help="Maximum number of DNS request handler threads to run concurrently. [%s]" % MAXTHREADS)
 main.add_argument("--hostname", metavar="string", default=HOSTNAME, help="The local host name. [%s]" % HOSTNAME)
 
 network = parser.add_argument_group("Network options")
@@ -101,6 +103,9 @@ if args.rethinkdb_host is not None: # and args.rethinkdb_host != "":
     rdb = fdns.Data(remote=args.rethinkdb_host, name=args.rethinkdb_name)
     if rdb == False or rdb.start() == False:
         raise Exception("Cannot start DNS server: %s" % "Failed to connect to RethinkDB")
+
+# Set the maxthreads value
+fdns.MAXIMUM_HANDLER_THREADS = args.max_threads
 
 # We should be good to go by here!
 log.info("Starting DNS server on '%s' port '%d'." % (args.address, args.port))

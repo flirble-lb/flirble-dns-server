@@ -24,9 +24,8 @@
 
 * DNSSEC? Is it possible with this Python DNS library?
 
-* May want a way to cap the number of threads we'll spawn to handle
-  requests. Similarly a way to limit the execution time of a thread would
-  be good self-protection.
+* May want a way to limit the execution time of a thread would be good
+  self-protection.
 
 * Can we do runtime profiling of each handler thread?
 
