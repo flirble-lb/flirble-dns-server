@@ -4,7 +4,7 @@
 import os, logging
 log = logging.getLogger(os.path.basename(__file__))
 
-import argparse, sys, json, socket
+import argparse, sys, json, socket, time
 import rethinkdb as r
 
 # Get the first component of the hostname
@@ -24,6 +24,8 @@ RETHINKDB_SERVERS = "servers"
 GROUP = None
 NAME = host
 LOAD = None
+STATIC = False
+
 
 # Build the command line parser
 parser = argparse.ArgumentParser(description="Update server load value for Flirble DNS Server")
@@ -35,8 +37,9 @@ main.add_argument("--pid-file", metavar="filename", default=PIDFILE, help="File 
 
 load = parser.add_argument_group("Server load options")
 load.add_argument("-g", "--group", metavar="server_group", required=True, default=GROUP, help="Server group name. Mandatory. [%s]" % "none" if GROUP is None else GROUP)
-load.add_argument("-n", "--name", metavar="string", default=NAME, help="The server host name. [%s]" % NAME)
-load.add_argument("-l", "--load", metavar="float", type=float, required=True, default=LOAD, help="Server load. Mandatory. [%s]" % "none" if GROUP is None else str(GROUP))
+load.add_argument("-n", "--name", metavar="string", required=True, default=NAME, help="The server host name. Mandatory. [%s]" % NAME)
+load.add_argument("-l", "--load", metavar="float", type=float, required=True, default=LOAD, help="Server load. Server is considered unavailable if this value is negative. Mandatory. [%s]" % "none" if GROUP is None else str(GROUP))
+load.add_argument("-s", "--static", default=STATIC, action="store_true", help="Make this host a static entry. If not specified the host will revert to having a timer. [%s]" % "False" if STATIC == False else "True")
 
 db = parser.add_argument_group("RethinkDB options")
 db.add_argument("--rethinkdb-host", metavar="name", default=RETHINKDB_HOST, help="Connection host for RethinkDB server. [%s]" % RETHINKDB_HOST)
@@ -72,7 +75,11 @@ else:
 	log.info("Old load: 'none'. New load: '%.3f'." % args.load)
 
 # And update the DB
-r.table(args.rethinkdb_servers).get(key).update({'load': args.load}).run(conn)
+update = {
+	'load': args.load,
+	'ts': time.time() if args.static == False else -1.0
+}
+r.table(args.rethinkdb_servers).get(key).update(update).run(conn)
 
 # All done
 conn.close()

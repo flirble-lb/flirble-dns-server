@@ -118,6 +118,8 @@ class Request(object):
                                         indent=4, separators=(',', ': ')))
             new = change["new_val"]
 
+            # Work out if the server is part of a group; if not, it implies
+            # a group with the same name as the server
             if ',' in new['name']:
                 (group, name) = new['name'].split(',')
             elif '!' in new['name']:
@@ -132,7 +134,13 @@ class Request(object):
             if group not in self.servers:
                 self.servers[group] = {}
 
+            # IF the timestamp is missing, add one
+            if 'ts' not in new:
+                new['ts'] = time.time()
+
+            # Store the new details
             self.servers[group][name] = new
+
 
 
     """

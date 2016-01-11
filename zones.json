@@ -59,7 +59,9 @@
 		"ttl": 5,
 		"params": {
 			"maxreplies": 2,
-			"maxload": 10
+			"maxload": 10,
+			"maxage": 120,
+			"maxdist": 10000
 		},
 		"rr": [
 			{

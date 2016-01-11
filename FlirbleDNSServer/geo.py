@@ -117,13 +117,32 @@ class Geo(object):
 
         for server in servers:
             # check server load, if applicable
-            # if it's not present in either the parameters or the server then
-            # this server remains a candidate
-            if 'maxload' in params and 'load' in server:
-                if float(server['load']) > float(params['maxload']):
-                    # server load exceeds allowable maximum, don't
-                    # consider it as a candidate
+            # if the server reports a negavitve valye for load then consider
+            # it unavailable
+            if 'load' in server:
+                if float(server['load']) < 0.0:
                     continue
+
+                # now compare it with any maxload we're given by the zone.
+                # if the reported load is higher, it's not a candidate
+                if 'maxload' in params:
+                    if float(server['load']) > float(params['maxload']):
+                        # server load exceeds allowable maximum, don't
+                        # consider it as a candidate
+                        continue
+
+
+            # check the timestamp of when we received the last update
+            # if it's too old, the server's not a candidate since it's not
+            # keeping us informed (and therefore probably dead)
+            if 'maxage' in params and 'ts' in server:
+                ts = float(server['ts'])
+                # if the timestamp is negative then we can assume this is
+                # a static entry and does not age out
+                if ts >= 0.0:
+                    age = time.time() - ts
+                    if age > float(server['maxage']):
+                        continue
 
             # use default precision unless one is given in the parameters
             precision = fdns.GCS_DISTANCE_PRECISION
@@ -133,7 +152,18 @@ class Geo(object):
             # calculate the distance between two lat,long pairs
             dist = fdns.gcs_distance((lat, lon), (server['lat'], server['lon']))
 
-            # see if we keep this server
+            # see if the zone specifies a maximum distance; a negative value
+            # (or the value is not present) means no limit
+            if 'maxdist' in params:
+                maxdist = float(params['maxdist']):
+                if maxdist >= 0.0 and dist > maxdist
+                    continue
+
+            # check if the server is closer than (or the same distance as)
+            # previous servers. if not, it's not a candidate.
+            # if it's closer then we remove previous candidates.
+            # remember that this value is rounded by the "precision" value
+            # above.
             if dist <= mindist:
                 if dist < mindist:
                     # this result is closer, start a new list
