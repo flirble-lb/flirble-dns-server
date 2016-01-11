@@ -34,16 +34,17 @@ reliability concerns.
 
 # Installation
 
-See [`INSTALL.md`](INSTALL.md) for installation details.
+See [INSTALL.md](INSTALL.md) for installation details.
 
 
 # Setup and running the DNS server
 
 ## JSON files
 
-Two example source files, `zones.json` and `servers.json`, provide a
-reference to the contents of the database. You can load these sample
-files, or other initial data, using `setup-rethinkdb`. See below.
+Two example source files, [zones.json](zones.json) and
+[servers.json](servers.json), provide a reference to the contents of the
+database. You can load these sample files, or other initial data, using
+`setup-rethinkdb`. See below.
 
 JSON files are only a starting point. The database is part of a dynamic
 system and the JSON files are just the initial dataset. Both zones and
@@ -54,7 +55,7 @@ zone data.
 
 ## Zone data
 
-Refer to the file [`zones.json`](zones.json) for a complete example. Zone data
+Refer to the file [zones.json](zones.json) for a complete example. Zone data
 refers to the naming of DNS resource records and specifying what information
 to respond with when that name is queried.
 
@@ -186,7 +187,7 @@ There are some additional values required for a `geo-dist` zone, for example:
 
 ## Server data
 
-Refer to the file [`servers.json`](servers.json) for a complete example.
+Refer to the file [servers.json](servers.json) for a complete example.
 Server data is the information use to determine candidate servers whose
 details may be included in a DNS response. These details include the
 geographic location of the server, its current "load" and so on.
