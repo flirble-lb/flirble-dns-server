@@ -259,19 +259,19 @@ The attributes here are:
 
 ## Running `dns-server`
 
-`./dns-server --help`
-`./dns-server --debug`
+To run the server, where it will daemonize and report serious issues
+to syslog, invoke `dns-server`. For other options, use `dns-server --help`.
 
 
 ### Network ports
 
-By default the DNS server will try to bind to port `8053` meaning that it will
-happily run as an unprivileged user, but won't respond to DNS queries on the
-standard port `53`.
+By default the DNS server will try to bind to TCP and UDP port `8053` meaning
+that it will happily run as an unprivileged user, but won't respond to DNS
+queries on the standard port `53`.
 
 There are several ways around this. One could run the process as `root` on
-Unix-like systems; however this is strongly not recommended. More favorable is
-to run it as an unprivileged user and use some system firewall function to
+Unix-like systems; however this is strongly discouraged. More favorable is to
+run it as an unprivileged user and use some system firewall function to
 provide port translation from `53` to, for example, `8053`.
 
 Also, for testing purposes, programs like `dig` do allow the port number to be
