@@ -93,7 +93,7 @@ Any familiarity with DNS should render these entries should be quite obvious.
   has both a `type` field and a `value` field. The values are always strings
   unless otherwise noted.
   * `type` _(string)_ specifies the DNS record type. Valid values include
-    `A`, `AAAA`, `CNAME`, `NS`, `MX` `PTR`, `SOA` `TXT` and `PTR`.
+    `A`, `AAAA`, `CNAME`, `NS`, `MX` `PTR`, `SOA`, `TXT` and `PTR`.
   * `value` _(string)_ is required for types `A`, `AAAA`, `CNAME`, `NS`, `MX`,
     `PTR`, `TXT` and `PTR`.
   * `pref` _(int)_ is required for type `MX` and is the preference value for
@@ -103,9 +103,11 @@ Any familiarity with DNS should render these entries should be quite obvious.
   * `rname` _(string)_ is required for type `SOA`. This is the name of the
     "responsible party" for the zone. Typically this is an email address with
     the `@` changed to `.`.
-  * `times` _(list)_ is required for type `SOA` and must be a list of five
-    numbers for the zone time values, e.g.
-    `"times": [ 2015010100, 3600, 10800, 86400, 3600 ]`.
+  * `times` _(list)_ is required for type `SOA` and can either be a list of
+    five values for the zone serial number and TTL values, e.g.
+    `"times": [ 2015010100, 3600, 10800, 86400, 3600 ]` or it can be the
+    `Null` value in which case these generic default set of values are
+    substituted: `[ "%serial", 3600, 10800, 86400, 3600 ]`.
 
     Note most of the values in `times` are normally used by downstream zone
     secondary servers. Since this implementation does not support zone
@@ -116,12 +118,13 @@ Any familiarity with DNS should render these entries should be quite obvious.
     The values in the list are:
       * The serial number for this ZONE and subordinate records. This is often
         a timestamp but it's only required that the value increment with
-        changes to the zone or its contents.
+        changes to the zone or its contents. The special value `%serial` will
+        be replaced with a number based on the timestamp at the time of the
+        query.
       * The number of seconds between refreshes of the zone by a secondary.
-        See the note under "serial number."
-      * The number of seconds after which a failed refresh should be reried.
-      * The upper limit of seconds before a zone is no longer considered
-        authoritative.
+      * The number of seconds after which a failed refresh should be retried.
+      * The upper limit of seconds without a refresh before a zone is no
+        longer considered authoritative.
       * The negative time-to-live; a count of how many seconds a resolver
         should consider a negative result to be valid before repeating the
         same request.

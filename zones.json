@@ -8,7 +8,7 @@
 				"type": "SOA",
 				"mname": "ns0.l.flirble.org.",
 				"rname": "hostmaster.flirble.org.",
-				"times": [ 2015010100, 3600, 10800, 86400, 3600 ]
+				"times": null
 			},
 			{
 				"type": "NS",

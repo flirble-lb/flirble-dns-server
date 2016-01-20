@@ -33,7 +33,4 @@
   maximum age etc). NAturally this would mean refactoring to break these
   candidate-list handling mechanisms into a common place.
 
-* Optionally allow SOA serial number to be generated at runtime (eg, based
-  on the current time)
-
 * Support zone transfers and notification?

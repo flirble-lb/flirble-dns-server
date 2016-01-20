@@ -14,6 +14,9 @@ except: import __init__ as fdns
 """Default DNS record TTL, if one is not given in the zone definition."""
 DEFAULT_TTL = 1800
 
+"""Default SOA 'times' field."""
+DEFAULT_SOA_TIMES = [ "%serial", 3600, 10800, 86400, 3600 ]
+
 """Time to cache Geo results for."""
 GEO_CACHE_TTL = 5
 
@@ -554,9 +557,23 @@ class Request(object):
     def _construct_rdata(self, rr):
         t = rr['type']
         if t == "SOA":
+            times = rr['times']
+
+            # No times field given? Use defaults.
+            if times is None:
+                times = DEFAULT_SOA_TIMES
+
+            # If the serial number is given as %serial then replace it with
+            # a timestamp
+            if str(times[0]) == "%serial":
+                times = ( # cheap way to make a new object
+                    int(time.time()),
+                    times[1], times[2], times[3], times[4]
+                )
+
             return dnslib.SOA(mname=rr['mname'],
                 rname=rr['rname'],
-                times=rr['times'])
+                times=times)
 
         if t == "MX":
             return dnslib.MX(label=rr['value'],
