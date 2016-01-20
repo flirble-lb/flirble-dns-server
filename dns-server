@@ -4,7 +4,7 @@
 import os, logging
 log = logging.getLogger(os.path.basename(__file__))
 
-import argparse, sys, socket, traceback
+import argparse, sys, os, socket, traceback
 import daemon, lockfile.pidlockfile
 import FlirbleDNSServer as fdns
 
@@ -19,6 +19,8 @@ HOSTNAME = socket.gethostname()
 
 ADDRESS = '::'
 PORT = 8053
+AUTHTOKEN = ""
+SSLCERT = None
 
 GEODB = "/usr/local/share/GeoIP/GeoLite2-City.mmdb"
 
@@ -41,6 +43,8 @@ main.add_argument("--hostname", metavar="string", default=HOSTNAME, help="The lo
 network = parser.add_argument_group("Network options")
 network.add_argument("--address", metavar="ip-address", default=ADDRESS, help="IP address to bind to. The default binds to the wildcard for both IPv4 and IPv6. [%s]" % ADDRESS)
 network.add_argument("--port", metavar="number", default=PORT, type=int, help="TCP and UDP port number to listen on. [%d]" % PORT)
+network.add_argument("--auth-token", metavar="token", default=AUTHTOKEN, help="If provided, this sends an authentication token when connecting to the database. [%s]" % AUTHTOKEN)
+network.add_argument("--ssl-cert", metavar="filename", default=SSLCERT, help="Enable SSL on the connection by providing a path to the CA certificate to authenticate the server against; SSL will not be used if blank. [%s]" % SSLCERT)
 
 geoip = parser.add_argument_group("GeoIP options")
 geoip.add_argument("--geodb", metavar="filename", default=GEODB, help="GeoIP City database file to use. [%s]" % GEODB)
@@ -98,10 +102,22 @@ if args.log_file is None and args.foreground is False:
 
 # Initialize and connect RethinkDB
 rdb = None
-if args.rethinkdb_host is not None: # and args.rethinkdb_host != "":
+if args.rethinkdb_host is not None:
+    if args.ssl_cert is None:
+        args.ssl_cert = {}
+    else:
+        if not os.path.isfile(args.ssl_cert):
+            log.error("SSL CA certificate file '%s' does not exist." %
+                args.ssl_cert)
+
+        args.ssl_cert = {
+            "ca_certs": args.ssl_cert
+        }
+
     log.info("Connecting to RethinkDB at '%s'" % args.rethinkdb_host)
 
-    rdb = fdns.Data(remote=args.rethinkdb_host, name=args.rethinkdb_name)
+    rdb = fdns.Data(remote=args.rethinkdb_host, name=args.rethinkdb_name,
+        auth=args.auth_token, ssl=args.ssl_cert)
     if rdb == False or rdb.start() == False:
         raise Exception("Cannot start DNS server: %s" %
             "Failed to connect to RethinkDB")

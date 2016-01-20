@@ -1,8 +1,8 @@
 # Flirble DNS Server
 
 This project provides an authoritative DNS server with a dynamic backend.
-Whilst it can also serve some static content its primary role is to respond
-to queries with records that reflect the result of some computation.
+Whilst it can also serve some static content its primary role is to respond to
+queries with records that reflect the result of some computation.
 
 Current backends:
 * Static.
@@ -22,13 +22,13 @@ The GeoIP backend supports these concepts for building a response:
 
 Using RethinkDB as a backend datastore this DNS server we can maintain
 consistent state across a cluster of hosts. It similarly uses RethinkDB to
-maintain the "server" list, and the load values. Programs are provided to
-load initial data into RethinkDB as well as to maintain the "load" value
-for each server.
+maintain the "server" list, and the load values. Programs are provided to load
+initial data into RethinkDB as well as to maintain the "load" value for each
+server.
 
 This system is not meant to be a replacement for a more robust commercial
-solution, such as from a content delivery network. In particular there may
-be performance issues with this implmenetation and certainly long term
+solution, such as from a content delivery network. In particular there may be
+performance issues with this implmenetation and certainly long term
 reliability concerns.
 
 
@@ -43,14 +43,13 @@ See [INSTALL.md](INSTALL.md) for installation details.
 
 Two example source files, [zones.json](zones.json) and
 [servers.json](servers.json), provide a reference to the contents of the
-database. You can load these sample files, or other initial data, using
+database. One can load these sample files, or other initial data, using
 `setup-rethinkdb`. See below.
 
-JSON files are only a starting point. The database is part of a dynamic
-system and the JSON files are just the initial dataset. Both zones and
-server data can be updated in the database at run-time and in real-time.
-It is naturally expected that server data will receive more updates than
-zone data.
+JSON files are only a starting point. The database is part of a dynamic system
+and the JSON files are just the initial dataset. Both zones and server data
+can be updated in the database at run-time and in real-time. It is naturally
+expected that server data will receive more updates than zone data.
 
 
 ## Zone data
@@ -187,18 +186,18 @@ There are some additional values required for a `geo-dist` zone, for example:
 
 ## Server data
 
-Refer to the file [servers.json](servers.json) for a complete example.
-Server data is the information use to determine candidate servers whose
-details may be included in a DNS response. These details include the
-geographic location of the server, its current "load" and so on.
+Refer to the file [servers.json](servers.json) for a complete example. Server
+data is the information use to determine candidate servers whose details may
+be included in a DNS response. These details include the geographic location
+of the server, its current "load" and so on.
 
-The structure is straightforward. Servers are clustered into "groups" which
-a zone file may reference to include that group of servers in the candidate
+The structure is straightforward. Servers are clustered into "groups" which a
+zone file may reference to include that group of servers in the candidate
 list. Each group contains a list of the servers it contains, and each server
-is defined by a dictionary of key/values.  To maintain efficiency when
-updates are distributed by the database the "group" and server "name" are
-joined to form a compound key; group "`flirble`" and server "`castaway`"
-becomes the key "`flirble!castaway`".
+is defined by a dictionary of key/values.  To maintain efficiency when updates
+are distributed by the database the "group" and server "name" are joined to
+form a compound key; group "`flirble`" and server "`castaway`" becomes the key
+"`flirble!castaway`".
 
 For example:
 
@@ -236,7 +235,7 @@ The attributes here are:
 * `city` _(string)_ is an informational field indicating the location of the
   server. This is not currently used other than in diagnostic `TXT` records.
 * `lat` _(float)_ gives the latitude of the server location. Depending on
-  the precision you are attempting to use, the `lat` and `lon` do not normally
+  the precision one is attempting to use, the `lat` and `lon` do not normally
   need to be especially accurate.
 * `lon` _(float)_ gives the longitude of the server location.
 * `ipv4` _(float)_ indicates the IPv4 address to use in an `A` record for
@@ -266,18 +265,17 @@ The attributes here are:
 
 ### Network ports
 
-By default the DNS server will try to bind to port `8053` meaning that it
-will happily run as an unprivileged user, but won't respond to DNS queries
-on the standard port `53`.
+By default the DNS server will try to bind to port `8053` meaning that it will
+happily run as an unprivileged user, but won't respond to DNS queries on the
+standard port `53`.
 
-There are several ways around this. You could run the process as `root`
-on Unix-like systems; however this is strongly not recommended. More
-favorable is to run it as an unprivileged user and use some system
-firewall function to provide port translation from `53` to, for example,
-`8053`.
+There are several ways around this. One could run the process as `root` on
+Unix-like systems; however this is strongly not recommended. More favorable is
+to run it as an unprivileged user and use some system firewall function to
+provide port translation from `53` to, for example, `8053`.
 
-Also, for testing purposes, programs like `dig` do allow you to specify the
-port number to use; for example:
+Also, for testing purposes, programs like `dig` do allow the port number to be
+specified; for example:
 
 ```
 $ dig @localhost -p 8053 -t any g.l.flirble.org.
@@ -315,20 +313,20 @@ ns1.l.flirble.org.	1800	IN	AAAA	2001:dba:0:11::11:11
 ;; MSG SIZE  rcvd: 262
 ```
 
-Note however that when using `localhost` it is usually impossible to
-perform a GeoIP lookup. To test GeoIP and dynamic responses the use of
-IP aliases on the loopback interface will help. Strategically choosing
-addresses in different parts of the world and binding them to the loopback
-interface will mean you can test each of those regions by simply directing
-your query to that address; though caution is advised since this will cut
-your computer off from reaching the real host of those addresses.
+Note however that when using `localhost` it is usually impossible to perform a
+GeoIP lookup. To test GeoIP and dynamic responses the use of IP aliases on the
+loopback interface will help. Strategically choosing addresses in different
+parts of the world and binding them to the loopback interface will mean one
+can test each of those regions by simply directing a query to that address;
+though caution is advised since this will cut the calling computer off from
+reaching the real host of those addresses.
 
 
 ### Threads and concurrency
 
-The DNS server tracks the number of request handling threads it has running
-at a given time. The server caps the number of threads it will spawn by
-default to 128. This can be specified on the command line with `--threads`.
+The DNS server tracks the number of request handling threads it has running at
+a given time. The server caps the number of threads it will spawn by default
+to 128. This can be specified on the command line with `--threads`.
 
 Any requests arriving when the maximum number of threads are already running
 will simply be ignored.
@@ -336,8 +334,8 @@ will simply be ignored.
 
 ## Loading initial data
 
-Several options to this program govern what JSON files it will load and
-where it will try to store them.
+Several options to this program govern what JSON files it will load and where
+it will try to store them.
 
 `./setup-rethinkdb --help`
 `./setup-rethinkdb --debug`
@@ -357,7 +355,41 @@ consideration as a target.
 `./update-server-load --group flirble --name castaway --load $(date +%M.%S)`
 `./update-server-load -g flirble -n castaway -l $(date +%M.%S) --rethinkdb-port 28016`
 
-This program also provides a timestamp for the update; you can indicate this
+This program also provides a timestamp for the update; one can indicate this
 is a static entry with `--static`; otherwise the timestamp is compared to the
 `maxage` value of the zone, if present. If the update is stale (older than
 allowed by `maxage`) then it's not a candidate for DNS responses.
+
+
+## SSL certificates
+
+When using SSL with RethinkDB the Python client requires the caller to provide
+the Certificate Authority certificate in order to verify that the server it is
+talking to is indeed the one anticipated. When one does not have this
+certificate, or its chain, handy, this OpenSSL command can be used to retrieve
+it from the server. Note that in this case the certificates should then be
+manually validated just in case.
+
+```bash
+echo -n | \
+  openssl s_client -host <host> -port 443 -prexit -showcerts 2>/dev/null | \
+  sed -n -e '/BEGIN/,/END/p'
+```
+
+Replace `<host>` with the hostname in question. The output of this should be
+stored in a file which can then be used with the `--ssl-cert <filename>`
+option.
+
+
+## Authentication token
+
+If the RethinkDB server has an authentication token configured then clients
+must use it in order to successfully connect. Tokens are a simple ASCII
+string. Since the are transmitting in plain text it is strongly recommended
+that the RethinkDB server be configured to use SSL, that the non-encrypted
+port be inaccessible outside the local host and that clients use SSL to
+connect to the server.
+
+The authentication token can be provided with the `--auth-token <token>`
+option.
+
