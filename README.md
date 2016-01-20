@@ -106,7 +106,7 @@ Any familiarity with DNS should render these entries should be quite obvious.
   * `times` _(list)_ is required for type `SOA` and can either be a list of
     five values for the zone serial number and TTL values, e.g.
     `"times": [ 2015010100, 3600, 10800, 86400, 3600 ]` or it can be the
-    `Null` value in which case these generic default set of values are
+    `null` value in which case these generic default set of values are
     substituted: `[ "%serial", 3600, 10800, 86400, 3600 ]`.
 
     Note most of the values in `times` are normally used by downstream zone
@@ -118,9 +118,9 @@ Any familiarity with DNS should render these entries should be quite obvious.
     The values in the list are:
       * The serial number for this ZONE and subordinate records. This is often
         a timestamp but it's only required that the value increment with
-        changes to the zone or its contents. The special value `%serial` will
-        be replaced with a number based on the timestamp at the time of the
-        query.
+        changes to the zone or its contents. The special value `%serial`
+        will be replaced with a number based on the timestamp at the time of
+        the query.
       * The number of seconds between refreshes of the zone by a secondary.
       * The number of seconds after which a failed refresh should be retried.
       * The upper limit of seconds without a refresh before a zone is no

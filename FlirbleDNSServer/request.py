@@ -567,7 +567,7 @@ class Request(object):
             # a timestamp
             if str(times[0]) == "%serial":
                 times = ( # cheap way to make a new object
-                    int(time.time()),
+                    int(time.time() / 10),
                     times[1], times[2], times[3], times[4]
                 )
 
