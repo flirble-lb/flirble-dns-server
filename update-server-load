@@ -31,7 +31,7 @@ STATIC = False
 parser = argparse.ArgumentParser(description="Update server load value for Flirble DNS Server")
 main = parser.add_argument_group("Main options")
 main.add_argument("-d", "--debug", default=DEBUG, action="store_true", help="Print extra diagnostic data. Implies --foreground and --log-level=debug. [%s]" % str(DEBUG))
-main.add_argument("--log-file", metavar="filename", default=LOGFILE, help="File to send logging output to. [%s]" % "stderr" if LOGFILE is None else LOGFILE)
+main.add_argument("--log-file", metavar="filename", default=LOGFILE, help="File to send logging output to; leave blank to use stderr. [%s]" % "stderr" if LOGFILE is None else LOGFILE)
 main.add_argument("--log-level", default=LOGLEVEL, choices=["debug", "info", "warning", "error", "critical"], help="Logging level. [%s]" % LOGLEVEL.lower())
 main.add_argument("--pid-file", metavar="filename", default=PIDFILE, help="File to store the PID value in when daemonized. [%s]" % PIDFILE)
 
@@ -53,35 +53,38 @@ args = parser.parse_args()
 if args.debug:
     args.log_level = "debug"
 
+if str(args.log_file) == "":
+    args.log_file = None
+
 # Setup logging
 logging.basicConfig(filename=args.log_file,
-	level=getattr(logging, args.log_level.upper(), None))
+    level=getattr(logging, args.log_level.upper(), None))
 
 # Connect
 conn = r.connect(host=args.rethinkdb_host, port=args.rethinkdb_port,
-	db=args.rethinkdb_name)
+    db=args.rethinkdb_name)
 
 # First check the group and server values are valid
 key = "%s!%s" % (args.group, args.name)
 value = r.table(args.rethinkdb_servers).get(key).run(conn)
 
 if value is None:
-	log.error("No server in group '%s' with name '%s' exists." %
-		(args.group, args.name))
-	conn.close()
-	sys.exit(1)
+    log.error("No server in group '%s' with name '%s' exists." %
+        (args.group, args.name))
+    conn.close()
+    sys.exit(1)
 
 # Update the load value
 if 'load' in value:
-	log.info("Old load: '%.3f'. New load: '%.3f'." %
-		(value['load'], args.load))
+    log.info("Old load: '%.3f'. New load: '%.3f'." %
+        (value['load'], args.load))
 else:
-	log.info("Old load: 'none'. New load: '%.3f'." % args.load)
+    log.info("Old load: 'none'. New load: '%.3f'." % args.load)
 
 # And update the DB
 update = {
-	'load': args.load,
-	'ts': time.time() if args.static == False else -1.0
+    'load': args.load,
+    'ts': time.time() if args.static == False else -1.0
 }
 r.table(args.rethinkdb_servers).get(key).update(update).run(conn)
 

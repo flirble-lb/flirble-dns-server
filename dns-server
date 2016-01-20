@@ -34,24 +34,24 @@ parser = argparse.ArgumentParser(description="Flirble DNS Server version %s." % 
 main = parser.add_argument_group("Main options")
 main.add_argument("-f", "--foreground", default=FOREGROUND, action="store_true", help="Don't daemonize, stay in the foreground. [%s]" % str(FOREGROUND))
 main.add_argument("-d", "--debug", default=DEBUG, action="store_true", help="Print extra diagnostic data. Implies --foreground and --log-level=debug. [%s]" % str(DEBUG))
-main.add_argument("--log-file", metavar="filename", default=LOGFILE, help="File to send logging output to. [%s]" % "stderr" if LOGFILE is None else LOGFILE)
+main.add_argument("--log-file", metavar="filename", default=LOGFILE, help="File to send logging output to; leave blank to use syslog. [%s]" % ("syslog" if LOGFILE is None else LOGFILE))
 main.add_argument("--log-level", default=LOGLEVEL, choices=["debug", "info", "warning", "error", "critical"], help="Logging level. [%s]" % LOGLEVEL.lower())
 main.add_argument("--pid-file", metavar="filename", default=PIDFILE, help="File to store the PID value in when daemonized. [%s]" % PIDFILE)
-main.add_argument("--max-threads", type=int, default=MAXTHREADS, help="Maximum number of DNS request handler threads to run concurrently. [%s]" % MAXTHREADS)
+main.add_argument("--max-threads", metavar="number", type=int, default=MAXTHREADS, help="Maximum number of DNS request handler threads to run concurrently. [%s]" % MAXTHREADS)
 main.add_argument("--hostname", metavar="string", default=HOSTNAME, help="The local host name. [%s]" % HOSTNAME)
 
 network = parser.add_argument_group("Network options")
-network.add_argument("--address", metavar="ip-address", default=ADDRESS, help="IP address to bind to. The default binds to the wildcard for both IPv4 and IPv6. [%s]" % ADDRESS)
-network.add_argument("--port", metavar="number", default=PORT, type=int, help="TCP and UDP port number to listen on. [%d]" % PORT)
-network.add_argument("--auth-token", metavar="token", default=AUTHTOKEN, help="If provided, this sends an authentication token when connecting to the database. [%s]" % AUTHTOKEN)
-network.add_argument("--ssl-cert", metavar="filename", default=SSLCERT, help="Enable SSL on the connection by providing a path to the CA certificate to authenticate the server against; SSL will not be used if blank. [%s]" % SSLCERT)
+network.add_argument("--address", metavar="ip-address", default=ADDRESS, help="IP address to bind to for DNS queries. The default binds to the wildcard for both IPv4 and IPv6. [%s]" % ADDRESS)
+network.add_argument("--port", metavar="number", default=PORT, type=int, help="TCP and UDP port number to listen for DNS queries on. [%d]" % PORT)
 
 geoip = parser.add_argument_group("GeoIP options")
 geoip.add_argument("--geodb", metavar="filename", default=GEODB, help="GeoIP City database file to use. [%s]" % GEODB)
 
 db = parser.add_argument_group("RethinkDB options")
-db.add_argument("--rethinkdb-host", metavar="name[:port]", default=RETHINKDB_HOST, help="Connection details for RethinkDB server, eg 'localhost:28015'. [%s]" % "none" if RETHINKDB_HOST is None else RETHINKDB_HOST)
+db.add_argument("--rethinkdb-host", metavar="name[:port]", default=RETHINKDB_HOST, help="Connection details for RethinkDB server, eg 'localhost:28015'. [%s]" % ("none" if RETHINKDB_HOST is None else RETHINKDB_HOST))
 db.add_argument("--rethinkdb-name", metavar="string", default=RETHINKDB_NAME, help="RethinkDB database name. [%s]" % RETHINKDB_NAME)
+db.add_argument("--auth-token", metavar="token", default=AUTHTOKEN, help="If provided, this sends an authentication token when connecting to the database. [%s]" % AUTHTOKEN)
+db.add_argument("--ssl-cert", metavar="filename", default=SSLCERT, help="Enable SSL on the connection by providing a path to the CA certificate to authenticate the server against; SSL will not be used if blank. [%s]" % SSLCERT)
 db.add_argument("--zones", metavar="table", default=ZONES, help="Zones table name. [%s]" % ZONES)
 db.add_argument("--servers", metavar="table", default=SERVERS, help="Servers table name. [%s]" % SERVERS)
 
@@ -68,7 +68,8 @@ if fdns.debug:
 logging.basicConfig(filename=args.log_file,
     level=getattr(logging, args.log_level.upper(), None))
 
-# If we're in a diagnostic mode then do some special stuff for logging
+# If we have no log file name and we're not in diagnostic mode, use syslog
+if str(args.log_file) == "": args.log_file = None
 if args.log_file is None and args.foreground is False:
     # Use a syslog handler for logging
     import platform, logging.handlers

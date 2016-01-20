@@ -351,9 +351,12 @@ The load value is a floating point number and can be any valid such value.
 Zones can indicate a maximum load threshold in order to keep a host in
 consideration as a target.
 
-`./update-server-load --help`
-`./update-server-load --group flirble --name castaway --load $(date +%M.%S)`
-`./update-server-load -g flirble -n castaway -l $(date +%M.%S) --rethinkdb-port 28016`
+Some arbitrary examples:
+```bash
+./update-server-load --help
+./update-server-load --group flirble --name castaway --load $(date +%M.%S)
+./update-server-load -g flirble -n castaway -l $(date +%M.%S) --rethinkdb-port 28016
+```
 
 This program also provides a timestamp for the update; one can indicate this
 is a static entry with `--static`; otherwise the timestamp is compared to the
