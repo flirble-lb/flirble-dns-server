@@ -260,13 +260,13 @@ The attributes here are:
   otherwise known as the UNIX epoch.
 
 
-## Running `dns-server`
+## Running `fdns-server`
 
 To run the server, where it will daemonize and report serious issues
-to syslog, invoke `dns-server`. For other options, use `dns-server --help`.
+to syslog, invoke `fdnsd`. For other options, use `fdnsd --help`.
 
 ```
-usage: dns-server [-h] [-f] [-d] [--log-file filename]
+usage: fdnsd [-h] [-f] [-d] [--log-file filename]
                   [--log-level {debug,info,warning,error,critical}]
                   [--pid-file filename] [--max-threads number]
                   [--hostname string] [--address ip-address] [--port number]
@@ -392,10 +392,10 @@ will simply be ignored.
 A program is provided to aid in loading initial data into the database.
 
 Several options to this program govern what JSON files it will load and where
-it will try to store them. See `./init-rethinkdb --help` for details:
+it will try to store them. See `./fdns-init-rethinkdb --help` for details:
 
 ```
-usage: init-rethinkdb [-h] [-d] [--log-file filename]
+usage: fdns-init-rethinkdb [-h] [-d] [--log-file filename]
                       [--log-level {debug,info,warning,error,critical}]
                       [--tables table_list] [--rethinkdb-host name]
                       [--rethinkdb-port name] [--rethinkdb-name string]
@@ -436,7 +436,7 @@ Source data options:
                         Servers source JSON file. [servers.json]
 ```
 
-Example invocation: `./init-rethinkdb --debug`.
+Example invocation: `./fdns-init-rethinkdb --debug`.
 
 By default it will try to connect to a RethinkDB on `localhost` at the usual
 port `28015` and will load `zones.json` and `servers.json` from the current
@@ -451,10 +451,8 @@ database. It can be used to add and delete servers as well as update
 individual fields of existing servers. Notably this can be used to update
 the `load` and `ts` values as part of a server health routine.
 
-TODO: Document the other functions of this program.
-
 ```
-usage: update-server [-h] [-d] [--log-file filename]
+usage: fdns-update-server [-h] [-d] [--log-file filename]
                      [--log-level {debug,info,warning,error,critical}]
                      [--pid-file filename] [-a] [-D] [-u] -g server_group -n
                      string [-l float] [-s] [--ipv4 ipv4_address]
@@ -512,14 +510,14 @@ RethinkDB options:
                         Servers table name. [servers]
 ```
 
-### Updating server load using `update-server`
+### Updating server load using `fdns-update-server`
 
 The load value is a floating point number and can be any valid such value.
 Zones can indicate a maximum load threshold in order to keep a host in
 consideration as a target. For example:
 
 ```bash
-./update-server --group flirble --name castaway --load $(date +%M.%S)
+./fdns-update-server --group flirble --name castaway --load $(date +%M.%S)
 
 ```
 

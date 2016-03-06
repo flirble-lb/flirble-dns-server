@@ -16,7 +16,7 @@
   programmaticaly to form the final "load" value. Ideally this could be
   run either in daemon more or one-shot mode; the latter providing a decent
   way to test the configuration. Include a dry-run mode, too. Unlike
-  `update-server-load` this would probably have a configuration file that
+  `fdns-update-server` this would probably have a configuration file that
   has the directives of what to do in it.
 
 * Really should write some tests for this thing now it has a fairly stable
@@ -34,3 +34,9 @@
   candidate-list handling mechanisms into a common place.
 
 * Support zone transfers and notification?
+
+* Document the other functions of `fdns-update-server`.
+
+* Document `fdnsd-run`.
+
+* Turn off ANY queries by default, make it configurable.
