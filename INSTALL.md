@@ -20,7 +20,7 @@ Then:
 sudo apt-get install -y git libpgm-5.1-0 \
     libmaxminddb0 libsodium13 libzmq3 geoip-bin geoipupdate mmdb-bin \
     python-daemon python-ipaddr python-dnslib python-maxminddb \
-    python-geoip2 python-lockfile python-zmq
+    python-geoip2 python-lockfile python-zmq python-rethinkdb
 ```
 
 ### Setup and fetch GeoIP data
