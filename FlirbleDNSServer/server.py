@@ -8,8 +8,7 @@ log = logging.getLogger(os.path.basename(__file__))
 import sys, threading, time
 import SocketServer
 
-try: import FlirbleDNSServer as fdns
-except: import __init__ as fdns
+import __init__ as fdns
 
 """Default local bind address."""
 ADDRESS = '::'
@@ -105,11 +104,3 @@ class Server(object):
         self.geo = None
         self.servers = None
         self.rdb = None
-
-
-if __name__ == '__main__':
-    log.info("Running test DNS server on port %d" % (PORT))
-    fdns.debug = True
-    server = Server(rdb=None)
-    server.run()
-

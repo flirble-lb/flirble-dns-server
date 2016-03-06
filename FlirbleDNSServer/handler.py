@@ -9,8 +9,7 @@ import sys, time, datetime, socket, threading
 import traceback
 import SocketServer
 
-try: import FlirbleDNSServer as fdns
-except: import __init__ as fdns
+import __init__ as fdns
 
 """Default number of concurrent handler threads to run."""
 MAXIMUM_HANDLER_THREADS = 128

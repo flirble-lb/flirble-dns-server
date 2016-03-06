@@ -10,8 +10,7 @@ import sys, time
 import threading
 import geoip2.database
 
-try: import FlirbleDNSServer as fdns
-except: import __init__ as fdns
+import __init__ as fdns
 
 """
 Handles Geographic lookup and related operations.
