@@ -265,6 +265,58 @@ The attributes here are:
 To run the server, where it will daemonize and report serious issues
 to syslog, invoke `dns-server`. For other options, use `dns-server --help`.
 
+```
+usage: dns-server [-h] [-f] [-d] [--log-file filename]
+                  [--log-level {debug,info,warning,error,critical}]
+                  [--pid-file filename] [--max-threads number]
+                  [--hostname string] [--address ip-address] [--port number]
+                  [--geodb filename] [--rethinkdb-host name[:port]]
+                  [--rethinkdb-name string] [--auth-token token]
+                  [--ssl-cert filename] [--zones table] [--servers table]
+
+Flirble DNS Server version 0.2.
+
+optional arguments:
+  -h, --help            show this help message and exit
+
+Main options:
+  -f, --foreground      Don't daemonize, stay in the foreground. [False]
+  -d, --debug           Print extra diagnostic data. Implies --foreground and
+                        --log-level=debug. [False]
+  --log-file filename   File to send logging output to; leave blank to use
+                        syslog. [syslog]
+  --log-level {debug,info,warning,error,critical}
+                        Logging level. [info]
+  --pid-file filename   File to store the PID value in when daemonized.
+                        [/var/run/flirble-dns-server.pid]
+  --max-threads number  Maximum number of DNS request handler threads to run
+                        concurrently. [128]
+  --hostname string     The local host name. [brae]
+
+Network options:
+  --address ip-address  IP address to bind to for DNS queries. The default
+                        binds to the wildcard for both IPv4 and IPv6. [::]
+  --port number         TCP and UDP port number to listen for DNS queries on.
+                        [8053]
+
+GeoIP options:
+  --geodb filename      GeoIP City database file to use.
+                        [/usr/local/share/GeoIP/GeoLite2-City.mmdb]
+
+RethinkDB options:
+  --rethinkdb-host name[:port]
+                        Connection details for RethinkDB server, eg
+                        'localhost:28015'. [localhost:28015]
+  --rethinkdb-name string
+                        RethinkDB database name. [flirble_dns]
+  --auth-token token    If provided, this sends an authentication token when
+                        connecting to the database. []
+  --ssl-cert filename   Enable SSL on the connection by providing a path to
+                        the CA certificate to authenticate the server against;
+                        SSL will not be used if blank. [None]
+  --zones table         Zones table name. [zones]
+  --servers table       Servers table name. [servers]
+```
 
 ### Network ports
 
@@ -337,36 +389,144 @@ will simply be ignored.
 
 ## Loading initial data
 
-Several options to this program govern what JSON files it will load and where
-it will try to store them.
+A program is provided to aid in loading initial data into the database.
 
-`./setup-rethinkdb --help`
-`./setup-rethinkdb --debug`
+Several options to this program govern what JSON files it will load and where
+it will try to store them. See `./init-rethinkdb --help` for details:
+
+```
+usage: init-rethinkdb [-h] [-d] [--log-file filename]
+                      [--log-level {debug,info,warning,error,critical}]
+                      [--tables table_list] [--rethinkdb-host name]
+                      [--rethinkdb-port name] [--rethinkdb-name string]
+                      [--rethinkdb-zones table] [--rethinkdb-servers table]
+                      [--source-zones filename] [--source-servers filename]
+
+Initial data loder for Flirble DNS Server
+
+optional arguments:
+  -h, --help            show this help message and exit
+
+Main options:
+  -d, --debug           Print extra diagnostic data. Implies --log-
+                        level=debug. [False]
+  --log-file filename   File to send logging output to; leave blank to use
+                        stderr. [stderr]
+  --log-level {debug,info,warning,error,critical}
+                        Logging level. [info]
+  --tables table_list   List of tables to initialize. Use a comma to delimit
+                        items. [zones,servers]
+
+RethinkDB options:
+  --rethinkdb-host name
+                        Connection host for RethinkDB server. [localhost]
+  --rethinkdb-port name
+                        Connection port for RethinkDB server. [28015]
+  --rethinkdb-name string
+                        RethinkDB database name. [flirble_dns]
+  --rethinkdb-zones table
+                        Zones table name. [zones]
+  --rethinkdb-servers table
+                        Servers table name. [servers]
+
+Source data options:
+  --source-zones filename
+                        Zones source JSON file. [zones.json]
+  --source-servers filename
+                        Servers source JSON file. [servers.json]
+```
+
+Example invocation: `./init-rethinkdb --debug`.
 
 By default it will try to connect to a RethinkDB on `localhost` at the usual
 port `28015` and will load `zones.json` and `servers.json` from the current
-directory and load them into the `zones` and `servers` tables respectively.
+directory into the `zones` and `servers` tables respectively. It will create
+the database `flirble_dns` if necessary.
 
 
-## Updating server load
+## Managing servers in the database
+
+This program is provided to aid the management of servers listed in the
+database. It can be used to add and delete servers as well as update
+individual fields of existing servers. Notably this can be used to update
+the `load` and `ts` values as part of a server health routine.
+
+TODO: Document the other functions of this program.
+
+```
+usage: update-server [-h] [-d] [--log-file filename]
+                     [--log-level {debug,info,warning,error,critical}]
+                     [--pid-file filename] [-a] [-D] [-u] -g server_group -n
+                     string [-l float] [-s] [--ipv4 ipv4_address]
+                     [--ipv6 ipv6_address] [--city string] [--lat float]
+                     [--lon float] [--rethinkdb-host name]
+                     [--rethinkdb-port name] [--rethinkdb-name string]
+                     [--rethinkdb-servers table]
+
+Update server values for Flirble DNS Server
+
+optional arguments:
+  -h, --help            show this help message and exit
+
+Main options:
+  -d, --debug           Print extra diagnostic data. Implies --foreground and
+                        --log-level=debug. [False]
+  --log-file filename   File to send logging output to; leave blank to use
+                        stderr. [stderr]
+  --log-level {debug,info,warning,error,critical}
+                        Logging level. [info]
+  --pid-file filename   File to store the PID value in when daemonized.
+                        [/var/run/fdns-load-monitor-brae.pid]
+
+Server actions:
+  -a, --add             Add a new server. [false]
+  -D, --delete          Delete a server. [false]
+  -u, --update          Update an existing server. [true]
+  -g server_group, --group server_group
+                        Server group name. Mandatory. [none]
+  -n string, --name string
+                        The server host name. Mandatory. [brae]
+
+Server load options:
+  -l float, --load float
+                        Server load. Server is considered unavailable if this
+                        value is negative. Mandatory. [none]
+  -s, --static          Make this host a static entry. If not specified the
+                        host will revert to having a timer. [False]
+
+Server configuration:
+  --ipv4 ipv4_address   The IPV4 address of the server.
+  --ipv6 ipv6_address   The IPV6 address of the server.
+  --city string         The city the server is located in.
+  --lat float           Latitude of the server location.
+  --lon float           Longitude of the server location.
+
+RethinkDB options:
+  --rethinkdb-host name
+                        Connection host for RethinkDB server. [localhost]
+  --rethinkdb-port name
+                        Connection port for RethinkDB server. [28015]
+  --rethinkdb-name string
+                        RethinkDB database name. [flirble_dns]
+  --rethinkdb-servers table
+                        Servers table name. [servers]
+```
+
+### Updating server load using `update-server`
 
 The load value is a floating point number and can be any valid such value.
 Zones can indicate a maximum load threshold in order to keep a host in
-consideration as a target.
+consideration as a target. For example:
 
-Some arbitrary examples:
 ```bash
-./update-server --help
 ./update-server --group flirble --name castaway --load $(date +%M.%S)
-./update-server -g flirble -n castaway -l $(date +%M.%S) --rethinkdb-port 28016
+
 ```
 
 This program also provides a timestamp for the update; one can indicate this
 is a static entry with `--static`; otherwise the timestamp is compared to the
 `maxage` value of the zone, if present. If the update is stale (older than
 allowed by `maxage`) then it's not a candidate for DNS responses.
-
-TODO: Document the other functions of this script.
 
 
 ## SSL certificates

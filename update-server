@@ -28,7 +28,7 @@ STATIC = False
 
 
 # Build the command line parser
-parser = argparse.ArgumentParser(description="Update server load value for Flirble DNS Server")
+parser = argparse.ArgumentParser(description="Update server values for Flirble DNS Server")
 main = parser.add_argument_group("Main options")
 main.add_argument("-d", "--debug", default=DEBUG, action="store_true", help="Print extra diagnostic data. Implies --foreground and --log-level=debug. [%s]" % str(DEBUG))
 main.add_argument("--log-file", metavar="filename", default=LOGFILE, help="File to send logging output to; leave blank to use stderr. [%s]" % "stderr" if LOGFILE is None else LOGFILE)
@@ -47,8 +47,8 @@ load.add_argument("-l", "--load", metavar="float", type=float, default=LOAD, hel
 load.add_argument("-s", "--static", default=STATIC, action="store_true", help="Make this host a static entry. If not specified the host will revert to having a timer. [%s]" % "False" if STATIC == False else "True")
 
 server = parser.add_argument_group('Server configuration')
-server.add_argument("--ipv4", metavar="IPv4 address", help="The IPV4 address of the server.")
-server.add_argument("--ipv6", metavar="IPv6 address", help="The IPV6 address of the server.")
+server.add_argument("--ipv4", metavar="ipv4_address", help="The IPV4 address of the server.")
+server.add_argument("--ipv6", metavar="ipv6_address", help="The IPV6 address of the server.")
 server.add_argument("--city", metavar="string", help="The city the server is located in.")
 server.add_argument("--lat", metavar="float", type=float, help="Latitude of the server location.")
 server.add_argument("--lon", metavar="float", type=float, help="Longitude of the server location.")
