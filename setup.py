@@ -32,6 +32,5 @@ setup(name='FlirbleDNSServer',
       license = 'BSD',
       classifiers = [ "Topic :: Internet :: Name Service (DNS)",
                       "Programming Language :: Python :: 2",
-                      "Programming Language :: Python :: 3",
                       ],
      )
