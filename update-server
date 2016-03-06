@@ -1,0 +1,183 @@
+#!/usr/bin/env python
+# Update the server load value
+
+import os, logging
+log = logging.getLogger(os.path.basename(__file__))
+
+import argparse, sys, json, socket, time
+import rethinkdb as r
+
+# Get the first component of the hostname
+host =  socket.gethostname().split(".")[0]
+
+# Defaults for the command line options.
+DEBUG = False
+LOGFILE = None
+LOGLEVEL = "info"
+PIDFILE = "/var/run/fdns-load-monitor-%s.pid" % host
+
+RETHINKDB_HOST = "localhost"
+RETHINKDB_PORT = "28015"
+RETHINKDB_NAME = "flirble_dns"
+RETHINKDB_SERVERS = "servers"
+
+GROUP = None
+NAME = host
+LOAD = None
+STATIC = False
+
+
+# Build the command line parser
+parser = argparse.ArgumentParser(description="Update server load value for Flirble DNS Server")
+main = parser.add_argument_group("Main options")
+main.add_argument("-d", "--debug", default=DEBUG, action="store_true", help="Print extra diagnostic data. Implies --foreground and --log-level=debug. [%s]" % str(DEBUG))
+main.add_argument("--log-file", metavar="filename", default=LOGFILE, help="File to send logging output to; leave blank to use stderr. [%s]" % "stderr" if LOGFILE is None else LOGFILE)
+main.add_argument("--log-level", default=LOGLEVEL, choices=["debug", "info", "warning", "error", "critical"], help="Logging level. [%s]" % LOGLEVEL.lower())
+main.add_argument("--pid-file", metavar="filename", default=PIDFILE, help="File to store the PID value in when daemonized. [%s]" % PIDFILE)
+
+actions = parser.add_argument_group("Server actions")
+actions.add_argument("-a", "--add", action="store_true", help="Add a new server. [false]")
+actions.add_argument("-D", "--delete", action="store_true", help="Delete a server. [false]")
+actions.add_argument("-u", "--update", action="store_true", help="Update an existing server. [true]")
+actions.add_argument("-g", "--group", metavar="server_group", required=True, default=GROUP, help="Server group name. Mandatory. [%s]" % "none" if GROUP is None else GROUP)
+actions.add_argument("-n", "--name", metavar="string", required=True, default=NAME, help="The server host name. Mandatory. [%s]" % NAME)
+
+load = parser.add_argument_group("Server load options")
+load.add_argument("-l", "--load", metavar="float", type=float, default=LOAD, help="Server load. Server is considered unavailable if this value is negative. Mandatory. [%s]" % "none" if GROUP is None else str(GROUP))
+load.add_argument("-s", "--static", default=STATIC, action="store_true", help="Make this host a static entry. If not specified the host will revert to having a timer. [%s]" % "False" if STATIC == False else "True")
+
+server = parser.add_argument_group('Server configuration')
+server.add_argument("--ipv4", metavar="IPv4 address", help="The IPV4 address of the server.")
+server.add_argument("--ipv6", metavar="IPv6 address", help="The IPV6 address of the server.")
+server.add_argument("--city", metavar="string", help="The city the server is located in.")
+server.add_argument("--lat", metavar="float", type=float, help="Latitude of the server location.")
+server.add_argument("--lon", metavar="float", type=float, help="Longitude of the server location.")
+
+db = parser.add_argument_group("RethinkDB options")
+db.add_argument("--rethinkdb-host", metavar="name", default=RETHINKDB_HOST, help="Connection host for RethinkDB server. [%s]" % RETHINKDB_HOST)
+db.add_argument("--rethinkdb-port", metavar="name", default=RETHINKDB_PORT, help="Connection port for RethinkDB server. [%s]" % RETHINKDB_PORT)
+db.add_argument("--rethinkdb-name", metavar="string", default=RETHINKDB_NAME, help="RethinkDB database name. [%s]" % RETHINKDB_NAME)
+db.add_argument("--rethinkdb-servers", metavar="table", default=RETHINKDB_SERVERS, help="Servers table name. [%s]" % RETHINKDB_SERVERS)
+
+# Run the command line parser
+args = parser.parse_args()
+
+
+# Work out the logging level
+if args.debug:
+    args.log_level = "debug"
+
+# If no log file given, use stderr
+if str(args.log_file) == "":
+    args.log_file = None
+
+# Setup logging
+logging.basicConfig(filename=args.log_file,
+    level=getattr(logging, args.log_level.upper(), None))
+
+
+# Check the action options; make sure what we're being asked to to do
+# makes sense
+count = 0
+if args.add: count += 1
+if args.delete: count += 1
+if args.update: count += 1
+if count > 1:
+    log.error("You must specify only one of --add, --delete and --update.")
+    sys.exit(1)
+if count == 0: args.update = True
+
+
+# Validate any IP addresses given
+if args.ipv4 is not None:
+    try:
+        socket.inet_pton(socket.AF_INET, args.ipv4)
+    except socket.error:
+        log.error("The value '%s' is not a valid IPv4 address." % args.ipv4)
+        sys.exit(1)
+
+if args.ipv6 is not None:
+    try:
+        socket.inet_pton(socket.AF_INET6, args.ipv6)
+    except socket.error:
+        log.error("The value '%s' is not a valid IPv6 address." % args.ipv6)
+        sys.exit(1)
+
+
+# Connect to the DB
+conn = r.connect(host=args.rethinkdb_host, port=args.rethinkdb_port,
+    db=args.rethinkdb_name)
+
+
+# Where our details get stored
+payload = {}
+
+
+# Check the group and server values are valid
+key = "%s!%s" % (args.group, args.name)
+value = r.table(args.rethinkdb_servers).get(key).run(conn)
+
+if value is None and (args.update or args.delete):
+    log.error("No server in group '%s' with name '%s' exists." %
+        (args.group, args.name))
+    conn.close()
+    sys.exit(1)
+elif value is not None and args.add:
+    log.error("Server already exists in group '%s' with name '%s'." %
+        (args.group, args.name))
+    conn.close()
+    sys.exit(1)
+
+# If adding, we need the key in the payload
+if args.add:
+    payload["name"] = key
+
+if not args.delete:
+    # Transcribe any of these values that we have
+    for item in ("ipv4", "ipv6", "city", "lat", "lon"):
+        if hasattr(args, item):
+            new = getattr(args, item)
+            if new is None:
+                continue
+            if args.update and item in value:
+                log.info("Old %s: %s. New %s: %s." %
+                    (item, str(value[item]), item, new))
+            else:
+                log.info("Old %s: %s. New %s: %s." %
+                    (item, "none", item, new))
+
+            payload[item] = new
+
+
+    # Do we have a load value?
+    if args.load is not None:
+        # Update the load value
+        if args.update and 'load' in value:
+            log.info("Old load: '%.3f'. New load: '%.3f'." %
+                (value['load'], args.load))
+        else:
+            log.info("Old load: 'none'. New load: '%.3f'." % args.load)
+
+        # And update the DB
+        payload['load'] = args.load
+        payload['ts'] = time.time() if args.static == False else -1.0
+    elif args.load is None and args.add:
+        # If we're adding and no load value was specified, pin this as a static
+        # entry.
+        payload['load'] = 0.0
+        payload['ts'] = -1.0
+
+
+if args.update:
+    log.info("Updating '%s'." % key)
+    r.table(args.rethinkdb_servers).get(key).update(payload).run(conn)
+elif args.add:
+    log.info("Adding '%s'." % key)
+    r.table(args.rethinkdb_servers).insert(payload).run(conn)
+elif args.delete:
+    log.info("Deleting '%s'." % key)
+    r.table(args.rethinkdb_servers).get(key).delete().run(conn)
+
+
+# All done
+conn.close()

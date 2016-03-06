@@ -356,15 +356,17 @@ consideration as a target.
 
 Some arbitrary examples:
 ```bash
-./update-server-load --help
-./update-server-load --group flirble --name castaway --load $(date +%M.%S)
-./update-server-load -g flirble -n castaway -l $(date +%M.%S) --rethinkdb-port 28016
+./update-server --help
+./update-server --group flirble --name castaway --load $(date +%M.%S)
+./update-server -g flirble -n castaway -l $(date +%M.%S) --rethinkdb-port 28016
 ```
 
 This program also provides a timestamp for the update; one can indicate this
 is a static entry with `--static`; otherwise the timestamp is compared to the
 `maxage` value of the zone, if present. If the update is stale (older than
 allowed by `maxage`) then it's not a candidate for DNS responses.
+
+TODO: Document the other functions of this script.
 
 
 ## SSL certificates
