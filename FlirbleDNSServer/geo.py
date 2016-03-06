@@ -141,7 +141,7 @@ class Geo(object):
                 # a static entry and does not age out
                 if ts >= 0.0:
                     age = time.time() - ts
-                    if age > float(server['maxage']):
+                    if age > float(params['maxage']):
                         continue
 
             # use default precision unless one is given in the parameters
