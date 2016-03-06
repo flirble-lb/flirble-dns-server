@@ -48,7 +48,6 @@ main = parser.add_argument_group("Main options")
 main.add_argument("-d", "--debug", default=DEBUG, action="store_true", help="Print extra diagnostic data. Implies --foreground and --log-level=debug. [%s]" % str(DEBUG))
 main.add_argument("--log-file", metavar="filename", default=LOGFILE, help="File to send logging output to; leave blank to use stderr. [%s]" % "stderr" if LOGFILE is None else LOGFILE)
 main.add_argument("--log-level", default=LOGLEVEL, choices=["debug", "info", "warning", "error", "critical"], help="Logging level. [%s]" % LOGLEVEL.lower())
-main.add_argument("--pid-file", metavar="filename", default=PIDFILE, help="File to store the PID value in when daemonized. [%s]" % PIDFILE)
 
 actions = parser.add_argument_group("Server actions")
 actions.add_argument("-a", "--add", action="store_true", help="Add a new server. [false]")

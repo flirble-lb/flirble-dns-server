@@ -267,12 +267,12 @@ to syslog, invoke `fdnsd`. For other options, use `fdnsd --help`.
 
 ```
 usage: fdnsd [-h] [-f] [-d] [--log-file filename]
-                  [--log-level {debug,info,warning,error,critical}]
-                  [--pid-file filename] [--max-threads number]
-                  [--hostname string] [--address ip-address] [--port number]
-                  [--geodb filename] [--rethinkdb-host name[:port]]
-                  [--rethinkdb-name string] [--auth-token token]
-                  [--ssl-cert filename] [--zones table] [--servers table]
+             [--log-level {debug,info,warning,error,critical}]
+             [--pid-file filename] [--max-threads number] [--hostname string]
+             [--address ip-address] [--port number] [--geodb filename]
+             [--rethinkdb-host name[:port]] [--rethinkdb-name string]
+             [--auth-token token] [--ssl-cert filename] [--zones table]
+             [--servers table]
 
 Flirble DNS Server version 0.2.
 
@@ -396,11 +396,13 @@ it will try to store them. See `./fdns-init-rethinkdb --help` for details:
 
 ```
 usage: fdns-init-rethinkdb [-h] [-d] [--log-file filename]
-                      [--log-level {debug,info,warning,error,critical}]
-                      [--tables table_list] [--rethinkdb-host name]
-                      [--rethinkdb-port name] [--rethinkdb-name string]
-                      [--rethinkdb-zones table] [--rethinkdb-servers table]
-                      [--source-zones filename] [--source-servers filename]
+                           [--log-level {debug,info,warning,error,critical}]
+                           [--tables table_list] [--rethinkdb-host name]
+                           [--rethinkdb-port name] [--rethinkdb-name string]
+                           [--rethinkdb-zones table]
+                           [--rethinkdb-servers table]
+                           [--source-zones filename]
+                           [--source-servers filename]
 
 Initial data loder for Flirble DNS Server
 
@@ -453,13 +455,13 @@ the `load` and `ts` values as part of a server health routine.
 
 ```
 usage: fdns-update-server [-h] [-d] [--log-file filename]
-                     [--log-level {debug,info,warning,error,critical}]
-                     [--pid-file filename] [-a] [-D] [-u] -g server_group -n
-                     string [-l float] [-s] [--ipv4 ipv4_address]
-                     [--ipv6 ipv6_address] [--city string] [--lat float]
-                     [--lon float] [--rethinkdb-host name]
-                     [--rethinkdb-port name] [--rethinkdb-name string]
-                     [--rethinkdb-servers table]
+                          [--log-level {debug,info,warning,error,critical}]
+                          [-a] [-D] [-u] -g server_group -n string [-l float]
+                          [-s] [--ipv4 ipv4_address] [--ipv6 ipv6_address]
+                          [--city string] [--lat float] [--lon float]
+                          [--rethinkdb-host name] [--rethinkdb-port name]
+                          [--rethinkdb-name string]
+                          [--rethinkdb-servers table]
 
 Update server values for Flirble DNS Server
 
@@ -473,8 +475,6 @@ Main options:
                         stderr. [stderr]
   --log-level {debug,info,warning,error,critical}
                         Logging level. [info]
-  --pid-file filename   File to store the PID value in when daemonized.
-                        [/var/run/fdns-load-monitor-brae.pid]
 
 Server actions:
   -a, --add             Add a new server. [false]
