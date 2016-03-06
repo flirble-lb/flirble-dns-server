@@ -72,6 +72,15 @@ meta = {
     }
 }
 
+# See if we need to create the DB
+db_list = r.db_list().run(conn)
+if args.rethinkdb_name not in db_list:
+        log.info("Creating database %s:" % args.rethinkdb_name)
+        r.db_create(args.rethinkdb_name).run(conn)
+
+# Get the list of tables.
+table_list = r.db(args.rethinkdb_name).table_list().run(conn)
+
 # Run over the tables, setting them up
 for table in meta:
     if table in args.tables:
@@ -80,8 +89,9 @@ for table in meta:
         log.info("Initializing %s:" % table)
 
         # Delete any existing tables with our names
-        log.info("  Deleting any existing table named '%s'." % m['table'])
-        r.db(args.rethinkdb_name).table_drop(m['table']).run(conn)
+        if m['table'] in table_list:
+            log.info("  Deleting any existing table named '%s'." % m['table'])
+            r.db(args.rethinkdb_name).table_drop(m['table']).run(conn)
 
         # Create new tables with the correct options
         log.info("  Creating table '%s'." % m['table'])
