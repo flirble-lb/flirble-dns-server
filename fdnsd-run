@@ -17,4 +17,4 @@
 dir=$(readlink -f $(dirname $0))
 ulimit -m 65536
 ulimit -v 1048576
-exec ${dir}/dns-server $*
+exec ${dir}/fdnsd $*
