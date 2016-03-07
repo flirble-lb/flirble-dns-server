@@ -469,8 +469,8 @@ optional arguments:
   -h, --help            show this help message and exit
 
 Main options:
-  -d, --debug           Print extra diagnostic data. Implies --foreground and
-                        --log-level=debug. [False]
+  -d, --debug           Print extra diagnostic data. Implies --log-
+                        level=debug. [False]
   --log-file filename   File to send logging output to; leave blank to use
                         stderr. [stderr]
   --log-level {debug,info,warning,error,critical}
