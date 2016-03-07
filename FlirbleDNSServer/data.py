@@ -64,7 +64,7 @@ class Data(object):
             (host, port) = remote.split(':')
         else:
             host = remote
-            port = None
+            port = 28015
 
         self._host = host
         self._port = port
