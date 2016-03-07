@@ -1,0 +1,189 @@
+#!/usr/bin/env python
+# Update the server load value as a daemon
+#
+#    Copyright 2016 Chris Luke
+#
+#   Licensed under the Apache License, Version 2.0 (the "License");
+#   you may not use this file except in compliance with the License.
+#   You may obtain a copy of the License at
+#
+#       http://www.apache.org/licenses/LICENSE-2.0
+#
+#   Unless required by applicable law or agreed to in writing, software
+#   distributed under the License is distributed on an "AS IS" BASIS,
+#   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#   See the License for the specific language governing permissions and
+#   limitations under the License.
+#
+
+import os, logging
+log = logging.getLogger(os.path.basename(__file__))
+
+import argparse, sys, json, socket, time
+import daemon, lockfile.pidlockfile
+import rethinkdb as r
+
+# Get the first component of the hostname
+host =  socket.gethostname().split(".")[0]
+
+# Defaults for the command line options.
+DEBUG = False
+LOGFILE = None
+LOGLEVEL = "info"
+PIDFILE = "/var/run/fdns-load-monitor-%s.pid" % host
+
+RETHINKDB_HOST = "localhost"
+RETHINKDB_PORT = "28015"
+RETHINKDB_NAME = "flirble_dns"
+RETHINKDB_SERVERS = "servers"
+
+FOREGROUND = False
+GROUP = None
+NAME = host
+SLEEP = 10.0
+
+LOADAVG_FACTOR = 1.0
+
+# Build the command line parser
+parser = argparse.ArgumentParser(description="Update server values for Flirble DNS Server")
+main = parser.add_argument_group("Main options")
+main.add_argument("-f", "--foreground", default=FOREGROUND, action="store_true", help="Don't daemonize, stay in the foreground. [%s]" % str(FOREGROUND))
+main.add_argument("-d", "--debug", default=DEBUG, action="store_true", help="Print extra diagnostic data. Implies --foreground and --log-level=debug. [%s]" % str(DEBUG))
+main.add_argument("--log-file", metavar="filename", default=LOGFILE, help="File to send logging output to; leave blank to use stderr. [%s]" % "stderr" if LOGFILE is None else LOGFILE)
+main.add_argument("--log-level", default=LOGLEVEL, choices=["debug", "info", "warning", "error", "critical"], help="Logging level. [%s]" % LOGLEVEL.lower())
+main.add_argument("--pid-file", metavar="filename", default=PIDFILE, help="File to store the PID value in when daemonized. [%s]" % PIDFILE)
+
+server = parser.add_argument_group('Server configuration')
+server.add_argument("-g", "--group", metavar="server_group", required=True, default=GROUP, help="Server group name. Mandatory. [%s]" % "none" if GROUP is None else GROUP)
+server.add_argument("-n", "--name", metavar="string", required=True, default=NAME, help="The server host name. Mandatory. [%s]" % NAME)
+server.add_argument('-s', '--sleep', metavar="seconds", type=float, default=SLEEP, help="The interval between load checks. [%1.1f]" % SLEEP)
+
+load = parser.add_argument_group("Load calculation configuration")
+load.add_argument("--load-avg", action="store_true", help="Use system load average. [False]")
+load.add_argument("--load-avg-factor", type=float, default=LOADAVG_FACTOR, help="Load average factor. [%f]" % LOADAVG_FACTOR)
+
+db = parser.add_argument_group("RethinkDB options")
+db.add_argument("--rethinkdb-host", metavar="name", default=RETHINKDB_HOST, help="Connection host for RethinkDB server. [%s]" % RETHINKDB_HOST)
+db.add_argument("--rethinkdb-port", metavar="name", default=RETHINKDB_PORT, help="Connection port for RethinkDB server. [%s]" % RETHINKDB_PORT)
+db.add_argument("--rethinkdb-name", metavar="string", default=RETHINKDB_NAME, help="RethinkDB database name. [%s]" % RETHINKDB_NAME)
+db.add_argument("--rethinkdb-servers", metavar="table", default=RETHINKDB_SERVERS, help="Servers table name. [%s]" % RETHINKDB_SERVERS)
+
+# Run the command line parser
+args = parser.parse_args()
+
+
+# Work out the logging level
+if args.debug:
+    args.log_level = "debug"
+    args.foreground = True
+
+# If no log file given, use stderr
+if str(args.log_file) == "":
+    args.log_file = None
+
+# Setup logging
+logging.basicConfig(filename=args.log_file,
+    level=getattr(logging, args.log_level.upper(), None))
+
+# If we have no log file name and we're not in diagnostic mode, use syslog
+if args.log_file is None and args.foreground is False:
+    # Use a syslog handler for logging
+    import platform, logging.handlers
+
+    # remove existing handlers
+    while len(log.root.handlers):
+        log.root.removeHandler(log.root.handlers[0])
+
+    # work out the path to the syslog socket
+    path = None
+    for p in ("/dev/log", "/var/run/syslog"):
+        if os.path.exists(p):
+            path = p
+            break
+
+    if path is None:
+        raise Exception("Unable to discover path to the syslog socket")
+
+    # create a syslog handler
+    h = logging.handlers.SysLogHandler(address=path)
+
+    if hasattr(platform, 'mac_ver'):
+        # bit of a hack for macos which filters info and below by default,
+        # and logging doesn't have a 'notice' level.
+        h.priority_map['INFO'] = 'notice'
+        if args.log_level.upper() == 'DEBUG':
+            h.priority_map['DEBUG'] = 'notice'
+
+    # add the syslog handler
+    log.root.addHandler(h)
+
+
+# Connect to the DB
+conn = r.connect(host=args.rethinkdb_host, port=args.rethinkdb_port,
+    db=args.rethinkdb_name)
+
+
+# Check the group and server values are valid
+key = "%s!%s" % (args.group, args.name)
+value = r.table(args.rethinkdb_servers).get(key).run(conn)
+
+if value is None:
+    log.error("No server in group '%s' with name '%s' exists." %
+        (args.group, args.name))
+    conn.close()
+    sys.exit(1)
+
+
+# If we're not going to stay in the foreground, we can now daemonize.
+if args.foreground is False:
+    # discover file handles to preserve
+    preserve_files = []
+    for h in log.root.handlers:
+        if hasattr(h, 'stream'):
+            preserve_files.append(h.stream)
+        if hasattr(h, 'socket'):
+            preserve_files.append(h.socket)
+
+    # extract the socket from rethinkdb
+    # NB: uses private attributes :(
+    if conn._instance is not None:
+        if hasattr(conn._instance, '_socket'):
+            s = conn._instance._socket
+            preserve_files.append(s)
+
+    # create the daemon context
+    ctx = daemon.DaemonContext()
+    ctx.umask = 0o027
+    ctx.pidfile = lockfile.pidlockfile.PIDLockFile(args.pid_file)
+    ctx.preserve_files = preserve_files
+
+    # daemonize
+    ctx.open()
+
+
+running = True
+while running:
+    # The cumulative load value
+    loadval = 0.0
+
+    # Use load average?
+    if args.load_avg:
+        try:
+            val = os.getloadavg()
+        except os.OSError:
+            val = (0,)
+        val = val[0] * args.load_avg_factor
+        loadval += val
+
+    # And update the DB
+    payload = {}
+    payload['load'] = loadval
+    payload['ts'] = time.time()
+
+    log.info("Updating '%s' with load %f." % (key, loadval))
+    r.table(args.rethinkdb_servers).get(key).update(payload).run(conn)
+
+    time.sleep(args.sleep)
+
+# All done
+conn.close()
