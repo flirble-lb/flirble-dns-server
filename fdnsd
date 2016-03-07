@@ -28,7 +28,7 @@ FOREGROUND = False
 DEBUG = fdns.debug
 LOGFILE = None
 LOGLEVEL = "info"
-PIDFILE = "/var/run/flirble-dns-server.pid"
+PIDFILE = "/var/run/flirble/fdnsd.pid"
 MAXTHREADS = 128
 HOSTNAME = socket.gethostname()
 

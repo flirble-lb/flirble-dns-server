@@ -30,7 +30,7 @@ host =  socket.gethostname().split(".")[0]
 DEBUG = False
 LOGFILE = None
 LOGLEVEL = "info"
-PIDFILE = "/var/run/fdns-load-monitor-%s.pid" % host
+PIDFILE = "/var/run/flirble/fdns-loadd-%s.pid" % host
 
 RETHINKDB_HOST = "localhost"
 RETHINKDB_PORT = "28015"
