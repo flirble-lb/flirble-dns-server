@@ -23,7 +23,7 @@ log = logging.getLogger(os.path.basename(__file__))
 import sys, json, threading, collections, time, copy
 import dnslib
 
-import __init__ as fdns
+import FlirbleDNSServer as fdns
 
 """Default DNS record TTL, if one is not given in the zone definition."""
 DEFAULT_TTL = 1800

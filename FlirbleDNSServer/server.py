@@ -23,7 +23,7 @@ log = logging.getLogger(os.path.basename(__file__))
 import sys, threading, time
 import SocketServer
 
-import __init__ as fdns
+import FlirbleDNSServer as fdns
 
 """Default local bind address."""
 ADDRESS = '::'

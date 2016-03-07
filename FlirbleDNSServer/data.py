@@ -23,7 +23,7 @@ log = logging.getLogger(os.path.basename(__file__))
 import sys, threading, time, traceback
 import rethinkdb as r
 
-import __init__ as fdns
+import FlirbleDNSServer as fdns
 
 """
 Manages the connection with a RethinkDB.
